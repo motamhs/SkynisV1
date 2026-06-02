@@ -23,15 +23,10 @@ export default function Cadastro() {
         }
 
         try {
-            const resposta = await fetch("http://localhost:8000/register", {
+            const resposta = await fetch("http://localhost:8000/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                // Enviando os dados exatamente como o users.py espera
-                body: JSON.stringify({
-                    nome: nome,
-                    email: email,
-                    senha: senha
-                }),
+                body: JSON.stringify({ nome, email, senha }),
             });
 
             const dados = await resposta.json();

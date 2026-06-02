@@ -16,14 +16,16 @@ export default function Filmes() {
   useEffect(() => {
     const buscarDados = async () => {
       try {
+        // Atualizado para as novas rotas do FastAPI
         const [respFilmes, respCategorias] = await Promise.all([
-          fetch("http://localhost:8000/listagem"),
-          fetch("http://localhost:8000/categorias")
+          fetch("http://localhost:8000/filmes"),
+          fetch("http://localhost:8000/dados/categorias")
         ]);
 
         if (respFilmes.ok) {
           const dadosFilmes = await respFilmes.json();
          
+          // Filtra para mostrar apenas os aprovados
           const aprovados = dadosFilmes.filter(f => f.flag === 1 || f.flag === true);
           setFilmes(aprovados);
           setFilmesFiltrados(aprovados);
@@ -67,7 +69,6 @@ export default function Filmes() {
             try {
                 cats = JSON.parse(filme.categorias);
             } catch(e) {
-            
                 cats = filme.categorias.split(',').map(nome => ({ nome: nome.trim() }));
             }
         } else if (Array.isArray(filme.categorias)) {
@@ -76,7 +77,6 @@ export default function Filmes() {
 
         if (!Array.isArray(cats)) return false;
 
- 
         return cats.some(c => {
             const matchId = (c.id && String(c.id) === String(categoriaSelecionada)) || 
                             (c.id_categoria && String(c.id_categoria) === String(categoriaSelecionada));
@@ -126,9 +126,8 @@ export default function Filmes() {
     
     if (categoriasValidas.length === 0) return <span className="tag">Sem Gênero</span>;
 
-
     return categoriasValidas.slice(0, 2).map((c) => (
-        <span key={c.id} className="tag">{c.nome}</span>
+        <span key={c.id || c.id_categoria} className="tag">{c.nome}</span>
     ));
   };
 
@@ -161,7 +160,6 @@ export default function Filmes() {
             >
               <option value="">Todos os Gêneros</option>
               {categorias.map((cat) => {
-               
                 const catId = cat.id || cat.id_categoria;
                 return (
                   <option key={catId} value={catId}>{cat.nome}</option>
@@ -181,16 +179,16 @@ export default function Filmes() {
         <div className="grid-todos-filmes">
           {filmesFiltrados.length > 0 ? (
             filmesFiltrados.map((filme) => (
-              <div key={`filme-${filme.id}`} className="card-filme">
-                <img src={filme.imagem} alt={filme.titulo} className="poster-filme" />
+              <div key={`filme-${filme.id || filme.id_filme}`} className="card-filme">
+                {/* Atualizado para ler o campo poster do novo backend */}
+                <img src={filme.poster || filme.imagem} alt={filme.titulo} className="poster-filme" />
                 <div className="card-info">
                   <h3 className="card-titulo">{filme.titulo}</h3>
                   <span className="card-ano">{filme.ano}</span>
                   <div className="card-tags">
-                
                     {renderizarCategorias(filme.categorias)}
                   </div>
-                  <button className="btn-ver-detalhes-card" onClick={() => handleVerDetalhes(filme.id)}>
+                  <button className="btn-ver-detalhes-card" onClick={() => handleVerDetalhes(filme.id || filme.id_filme)}>
                     Ver detalhes
                   </button>
                 </div>

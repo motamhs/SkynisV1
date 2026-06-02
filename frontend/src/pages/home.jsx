@@ -10,10 +10,14 @@ export default function Home() {
     useEffect(() => {
         const buscarFilmes = async () => {
             try {
-                const resposta = await fetch("http://localhost:8000/listagem");
+                // Atualizado para a nova rota do FastAPI
+                const resposta = await fetch("http://localhost:8000/filmes");
                 if (resposta.ok) {
                     const dados = await resposta.json();
-                    setFilmes(dados);
+                    
+                    // Filtra para garantir que apenas filmes aprovados apareçam na Home
+                    const aprovados = dados.filter(f => f.flag === true || f.flag === 1);
+                    setFilmes(aprovados);
                 }
             } catch (erro) {
                 console.error("Erro ao buscar filmes:", erro);
@@ -121,7 +125,8 @@ export default function Home() {
                     <div className="grid-filmes">
                         {outrosFilmes.map((filme) => (
                             <div key={`destaque-${filme.id}`} className="card-filme">
-                                <img src={filme.imagem} alt={filme.titulo} className="poster-filme" />
+                                {/* Atualizado para usar filme.poster acompanhando o novo schemas.py */}
+                                <img src={filme.poster || filme.imagem} alt={filme.titulo} className="poster-filme" />
                                 <div className="card-info">
                                     <h3 className="card-titulo">{filme.titulo}</h3>
                                     <span className="card-ano">{filme.ano}</span>

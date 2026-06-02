@@ -17,17 +17,18 @@ export default function Login() {
             formData.append("email", email);
             formData.append("password", senha);
 
-            const resposta = await fetch("http://localhost:8000/send_loginho", {
+            const resposta = await fetch("http://localhost:8000/auth/login", {
                 method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: formData.toString(),
+                headers: { "Content-Type": "application/json" },
+               
+                body: JSON.stringify({ email: email, senha: senha }),
             });
 
             const dados = await resposta.json();
 
             if (resposta.ok) {
                 console.log("Login backend feito com sucesso!");
-               
+
                 localStorage.setItem("access_token", dados.access_token);
                 localStorage.setItem("refresh_token", dados.refresh_token);
 
@@ -40,7 +41,7 @@ export default function Login() {
             alert("Erro ao conectar com o servidor.");
         }
     };
-    
+
     return (
         <div className="pagina-login">
             <header className="header-login">

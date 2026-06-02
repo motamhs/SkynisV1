@@ -6,12 +6,12 @@ import "./layout.css";
 
 export default function Layout() {
   const [role, setRole] = useState(null);
-  const location = useLocation(); 
+  const location = useLocation();
   const navigate = useNavigate();
 
   const verificarLogin = () => {
     const token = localStorage.getItem("access_token");
-    
+
     if (!token) {
       setRole(null);
       return;
@@ -22,13 +22,13 @@ export default function Layout() {
       const payloadJson = JSON.parse(
         atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/'))
       );
-      
+
       console.log("Usuário logado:", payloadJson.sub, "Role:", payloadJson.role);
 
       if (payloadJson.role === "user") {
         setRole("usuario");
       } else {
-        setRole(payloadJson.role); 
+        setRole(payloadJson.role);
       }
     } catch (e) {
       console.error("Erro ao ler token:", e);
@@ -39,14 +39,14 @@ export default function Layout() {
 
   useEffect(() => {
     verificarLogin();
-  }, [location]); 
+  }, [location]);
 
   const tratarSair = async () => {
     const refreshToken = localStorage.getItem("refresh_token");
-    
+
     if (refreshToken) {
       try {
-        await fetch("http://localhost:8000/logout", {
+        await fetch("http://localhost:8000/auth/logout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ refresh_token: refreshToken })
@@ -64,7 +64,7 @@ export default function Layout() {
 
   return (
     <div className="layout-container">
-    
+
       <Navbar role={role} aoSair={tratarSair} />
 
       <main className="conteudo-principal">
