@@ -22,6 +22,17 @@
   background-position: top center;
   display: flex;
   align-items: flex-end; 
+  animation: hero-fade 0.45s ease;
+}
+
+@keyframes hero-fade {
+  from {
+    opacity: 0.82;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .hero-gradiente {
@@ -58,6 +69,13 @@
   margin-bottom: 16px;
 }
 
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
 .bolinha {
   font-size: 0.5rem;
 }
@@ -72,6 +90,29 @@
 .hero-botoes {
   display: flex;
   gap: 16px;
+}
+
+.hero-indicadores {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.hero-indicador {
+  width: 28px;
+  height: 4px;
+  border: 0;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: width 0.2s, background-color 0.2s;
+}
+
+.hero-indicador.ativo,
+.hero-indicador:hover {
+  width: 44px;
+  background-color: #e03c2f;
 }
 
 .btn-ver-detalhes-hero {

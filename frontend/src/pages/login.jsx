@@ -1,28 +1,40 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Globe, Mail } from "lucide-react";
+import { Eye, EyeOff, Mail } from "lucide-react";
+import Popup from "../components/popup";
 import LogoSkynis from "../assets/logo Skynis.svg?react";
 import "./css/login.css";
 
+function obterMensagemErro(dados, mensagemPadrao) {
+    if (typeof dados?.detail === "string") return dados.detail;
+    if (Array.isArray(dados?.detail) && dados.detail.length > 0) {
+        return dados.detail.map((erro) => {
+            const campo = erro.loc?.[erro.loc.length - 1];
+            if (campo === "email" && erro.msg?.toLowerCase().includes("email")) {
+                return "Informe um e-mail válido.";
+            }
+            return erro.msg?.replace("Value error, ", "") || mensagemPadrao;
+        }).join("\n");
+    }
+    return dados?.error || mensagemPadrao;
+}
+
 export default function Login() {
-    const [email, setEmail] = useState("");
+    const [login, setLogin] = useState("");
     const [senha, setSenha] = useState("");
     const [mostrarSenha, setMostrarSenha] = useState(false);
+    const [popup, setPopup] = useState({ aberto: false });
     const navigate = useNavigate();
 
     const handleLogin = async (e) => {
         e.preventDefault();
 
         try {
-            const formData = new URLSearchParams();
-            formData.append("email", email);
-            formData.append("password", senha);
-
             const resposta = await fetch("http://localhost:8000/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                
-                body: JSON.stringify({ email: email, senha: senha }),
+                body: JSON.stringify({ email: login.trim(), senha: senha }),
             });
 
             const dados = await resposta.json();
@@ -35,11 +47,25 @@ export default function Login() {
 
                 navigate("/");
             } else {
-                alert(dados.error || "Erro ao fazer login. Verifique suas credenciais.");
+                setPopup({
+                    aberto: true,
+                    tipo: "erro",
+                    titulo: "Erro ao fazer login",
+                    mensagem: obterMensagemErro(dados, "Erro ao fazer login. Verifique suas credenciais."),
+                    textoConfirmar: "Fechar",
+                    onFechar: () => setPopup({ aberto: false }),
+                });
             }
         } catch (erro) {
             console.error("Erro na requisição:", erro);
-            alert("Erro ao conectar com o servidor.");
+            setPopup({
+                aberto: true,
+                tipo: "erro",
+                titulo: "Erro de conexao",
+                mensagem: "Erro ao conectar com o servidor.",
+                textoConfirmar: "Fechar",
+                onFechar: () => setPopup({ aberto: false }),
+            });
         }
     };
 
@@ -59,9 +85,9 @@ export default function Login() {
                         <div className="grupo-input">
                             <input
                                 type="text"
-                                placeholder="E-mail"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="E-mail ou usuário"
+                                value={login}
+                                onChange={(e) => setLogin(e.target.value)}
                                 required
                             />
 
@@ -95,23 +121,20 @@ export default function Login() {
                         </button>
                     </form>
 
-                    <div className="divisor">
-                        <span>OU</span>
-                    </div>
-
-                    <div className="botoes-alternativos">
-                        <button type="button" className="btn-alternativo">
-
-                            <Globe size={18} />
-                            Continuar com Google
-                        </button>
-                    </div>
-
                     <p className="link-cadastro">
                         Não tem conta ? <Link to="/cadastro">Cadastre-se</Link>
                     </p>
                 </div>
             </main>
+
+            <Popup
+                aberto={popup.aberto}
+                tipo={popup.tipo}
+                titulo={popup.titulo}
+                mensagem={popup.mensagem}
+                textoConfirmar={popup.textoConfirmar}
+                onFechar={popup.onFechar}
+            />
         </div>
     );
 }

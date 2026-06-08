@@ -47,16 +47,3 @@
 .footer-links a:hover {
   color: #ffffff; 
 }
-
-@media (max-width: 768px) {
-  .footer-container {
-    flex-direction: column;
-    gap: 16px;
-    padding: 24px 20px;
-    text-align: center;
-  }
-  
-  .footer-logo, .footer-texto, .footer-links {
-    justify-content: center;
-  }
-}

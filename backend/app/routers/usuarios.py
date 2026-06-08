@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -20,7 +21,33 @@ def update_me(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    for field, value in body.model_dump(exclude_none=True).items():
+    dados = body.model_dump(exclude_none=True)
+
+    if "email" in dados:
+        email = str(dados["email"]).strip().lower()
+        existente = (
+            db.query(Usuario)
+            .filter(func.lower(Usuario.email) == email, Usuario.id_usuario != current_user.id_usuario)
+            .first()
+        )
+        if existente:
+            raise HTTPException(status_code=400, detail="E-mail já cadastrado")
+        dados["email"] = email
+
+    if "apelido" in dados:
+        apelido = dados["apelido"].strip()
+        if not apelido:
+            raise HTTPException(status_code=400, detail="Nome de usuário é obrigatório")
+        existente = (
+            db.query(Usuario)
+            .filter(func.lower(Usuario.apelido) == apelido.lower(), Usuario.id_usuario != current_user.id_usuario)
+            .first()
+        )
+        if existente:
+            raise HTTPException(status_code=400, detail="Nome de usuário já cadastrado")
+        dados["apelido"] = apelido
+
+    for field, value in dados.items():
         if field == "senha":
             setattr(current_user, field, hash_password(value))
         else:

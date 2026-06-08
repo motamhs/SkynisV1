@@ -46,6 +46,7 @@ class AtorOut(BaseModel):
     id_ator: int
     nome: str
     sobrenome: str
+    foto: Optional[str] = None
 
 class DiretorOut(BaseModel):
     model_config = {"from_attributes": True}
@@ -121,16 +122,19 @@ class FilmeListOut(BaseModel):
     titulo: str
     ano: Optional[int]
     poster: Optional[str]
+    banner: Optional[str]
+    sinopse: Optional[str]
     flag: Optional[bool]
     pais_origem: Optional[PaisOut] = None
     categorias: List[CategoriaOut] = []
+    diretores: List[DiretorOut] = []
 
 # ─── Usuário ──────────────────────────────────────────────────────────────────
 
 class UsuarioCreate(BaseModel):
     nome: str
     sobrenome: Optional[str] = None
-    apelido: Optional[str] = None
+    apelido: str
     email: EmailStr
     senha: str
     role: str = "user"
@@ -144,6 +148,13 @@ class UsuarioCreate(BaseModel):
             raise ValueError("Senha deve ter ao menos 6 caracteres")
         return v
 
+    @field_validator("apelido")
+    @classmethod
+    def apelido_obrigatorio(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Nome de usuário é obrigatório")
+        return v.strip()
+
     @field_validator("role")
     @classmethod
     def role_valida(cls, v: str) -> str:
@@ -155,6 +166,7 @@ class UsuarioUpdate(BaseModel):
     nome: Optional[str] = None
     sobrenome: Optional[str] = None
     apelido: Optional[str] = None
+    email: Optional[EmailStr] = None
     data_nascimento: Optional[date] = None
     imagem: Optional[str] = None
     senha: Optional[str] = None
@@ -184,7 +196,7 @@ class RoleUpdate(BaseModel):
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
 class LoginIn(BaseModel):
-    email: EmailStr
+    email: str
     senha: str
 
 class TokenOut(BaseModel):

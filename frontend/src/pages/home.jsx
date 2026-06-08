@@ -5,18 +5,17 @@ import "./css/home.css";
 
 export default function Home() {
     const [filmes, setFilmes] = useState([]);
+    const [indiceHero, setIndiceHero] = useState(0);
     const [carregando, setCarregando] = useState(true);
     const navigate = useNavigate();
 
     useEffect(() => {
         const buscarFilmes = async () => {
             try {
-                // Atualizado para a nova rota do FastAPI
                 const resposta = await fetch("http://localhost:8000/filmes");
                 if (resposta.ok) {
                     const dados = await resposta.json();
                     
-                    // Filtra para garantir que apenas filmes aprovados apareçam na Home
                     const aprovados = dados.filter(f => f.flag === true || f.flag === 1);
                     setFilmes(aprovados);
                 }
@@ -29,6 +28,17 @@ export default function Home() {
 
         buscarFilmes();
     }, []);
+
+    useEffect(() => {
+        const totalDestaques = Math.min(filmes.length, 5);
+        if (totalDestaques <= 1) return;
+
+        const intervalo = setInterval(() => {
+            setIndiceHero((indiceAtual) => (indiceAtual + 1) % totalDestaques);
+        }, 6000);
+
+        return () => clearInterval(intervalo);
+    }, [filmes.length]);
 
     const handleVerDetalhes = (idFilme) => {
         if (!idFilme) return;
@@ -47,12 +57,45 @@ export default function Home() {
         return texto.substring(0, limite) + "...";
     };
 
+    const normalizarLista = (valor) => {
+        if (!valor) return [];
+        if (Array.isArray(valor)) return valor;
+
+        if (typeof valor === "string") {
+            try {
+                const parsed = JSON.parse(valor);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                return valor
+                    .split(",")
+                    .map((nome) => ({ nome: nome.trim() }))
+                    .filter((item) => item.nome);
+            }
+        }
+
+        return [];
+    };
+
+    const nomeItem = (item) => {
+        if (!item) return "";
+        if (typeof item === "string") return item;
+
+        return [item.nome, item.sobrenome].filter(Boolean).join(" ");
+    };
+
+    const nomeDiretorPrincipal = (filme) => {
+        const [diretor] = normalizarLista(filme?.diretores);
+        return nomeItem(diretor);
+    };
+
+    const filmesHero = filmes.slice(0, 5);
+    const indiceHeroSeguro = filmesHero.length > 0 ? indiceHero % filmesHero.length : 0;
+    const filmeHero = filmesHero[indiceHeroSeguro] || null;
+    const outrosFilmes = filmes.slice(5);
+
     if (carregando) {
         return <div className="carregando">Carregando filmes...</div>;
     }
-
-    const filmeHero = filmes.length > 0 ? filmes[0] : null;
-    const outrosFilmes = filmes.slice(1);
 
     const renderizarCategorias = (categoriasData) => {
         if (!categoriasData || categoriasData.length === 0) {
@@ -64,7 +107,7 @@ export default function Home() {
         if (typeof categoriasData === 'string') {
             try {
                 cats = JSON.parse(categoriasData);
-            } catch (e) {
+            } catch {
                 cats = categoriasData.split(',').map((nome, index) => ({
                     id: `cat-${index}-${Math.random()}`,
                     nome: nome.trim()
@@ -89,8 +132,9 @@ export default function Home() {
         <div className="pagina-inicio">
             {filmeHero && (
                 <section
+                    key={filmeHero.id || filmeHero.id_filme}
                     className="hero-section"
-                    style={{ backgroundImage: `url('https://cdn.crusoe.com.br/uploads/2025/08/AAAABWfz8lKE462s2FJGRKy547BrnBCeFrkDfXSfioM73OJkgn-Ee0du7Pz3T4ekqvxe3iFYw6z10S0SlMcoiKwe2xeGRYqNJ6QD-Qyk.jpg')` }}
+                    style={{ backgroundImage: `url("${filmeHero.banner}")` }}
                 >
                     <div className="hero-gradiente"></div>
 
@@ -99,7 +143,10 @@ export default function Home() {
                         <div className="hero-infos">
                             <span>{filmeHero.ano}</span>
                             <span className="bolinha">•</span>
-                            <span>{filmeHero.duracao || "N/A"}</span>
+                            <span>{nomeDiretorPrincipal(filmeHero)}</span>
+                        </div>
+                        <div className="hero-tags">
+                            {renderizarCategorias(filmeHero.categorias)}
                         </div>
                         <p className="hero-descricao">
                             {limitarTexto(filmeHero.sinopse, 200)}
@@ -116,6 +163,19 @@ export default function Home() {
                                 Explorar Filmes
                             </button>
                         </div>
+                        {filmesHero.length > 1 && (
+                            <div className="hero-indicadores" aria-label="Filmes em destaque no banner">
+                                {filmesHero.map((filme, index) => (
+                                    <button
+                                        key={`hero-indicador-${filme.id || filme.id_filme}`}
+                                        type="button"
+                                        className={`hero-indicador${index === indiceHeroSeguro ? " ativo" : ""}`}
+                                        onClick={() => setIndiceHero(index)}
+                                        aria-label={`Mostrar ${filme.titulo} no banner`}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </section>
             )}
@@ -126,13 +186,11 @@ export default function Home() {
                     <div className="grid-filmes">
                         {outrosFilmes.map((filme) => (
                             <div key={`destaque-${filme.id || filme.id_filme}`} className="card-filme">
-                                {/* Atualizado para usar filme.poster acompanhando o novo schemas.py */}
                                 <img src={filme.poster || filme.imagem} alt={filme.titulo} className="poster-filme" />
                                 <div className="card-info">
                                     <h3 className="card-titulo">{filme.titulo}</h3>
                                     <span className="card-ano">{filme.ano}</span>
                                     <div className="card-tags">
-                                        {/* Renderiza as tags lendo direto do filme */}
                                         {renderizarCategorias(filme.categorias)}
                                     </div>
                                     <button

@@ -40,6 +40,7 @@ class Ator(Base):
     id_ator = Column(Integer, primary_key=True, autoincrement=True)
     nome = Column(String(255), nullable=False, unique=True)
     sobrenome = Column(String(255), nullable=False)
+    foto = Column(String(500))
     paises = relationship("Pais", secondary="ator_pais", viewonly=True)
 
 

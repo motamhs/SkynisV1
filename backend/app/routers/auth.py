@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -17,14 +18,19 @@ router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
 @router.post("/register", response_model=UsuarioOut, status_code=201)
 def register(body: UsuarioCreate, db: Session = Depends(get_db)):
-    if db.query(Usuario).filter(Usuario.email == body.email).first():
+    email = str(body.email).strip().lower()
+    apelido = body.apelido.strip()
+
+    if db.query(Usuario).filter(func.lower(Usuario.email) == email).first():
         raise HTTPException(status_code=400, detail="E-mail já cadastrado")
+    if db.query(Usuario).filter(func.lower(Usuario.apelido) == apelido.lower()).first():
+        raise HTTPException(status_code=400, detail="Nome de usuário já cadastrado")
 
     user = Usuario(
-        nome=body.nome,
+        nome=body.nome.strip(),
         sobrenome=body.sobrenome,
-        apelido=body.apelido,
-        email=body.email,
+        apelido=apelido,
+        email=email,
         senha=hash_password(body.senha),
         data_nascimento=body.data_nascimento,
         imagem=body.imagem,
@@ -37,7 +43,18 @@ def register(body: UsuarioCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenOut)
 def login(body: LoginIn, db: Session = Depends(get_db)):
-    user = db.query(Usuario).filter(Usuario.email == body.email).first()
+    login_id = body.email.strip()
+    login_id_normalizado = login_id.lower()
+    user = (
+        db.query(Usuario)
+        .filter(
+            or_(
+                func.lower(Usuario.email) == login_id_normalizado,
+                func.lower(Usuario.apelido) == login_id_normalizado,
+            )
+        )
+        .first()
+    )
     if not user or not verify_password(body.senha, user.senha):
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
 

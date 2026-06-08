@@ -1,12 +1,14 @@
 import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, Clock, Film, Pencil, Trash2, X } from "lucide-react";
+import Popup from "../components/popup";
 import "./css/pageadm.css";
 
 export default function Admin() {
   const [filmes, setFilmes] = useState([]);
   const [pendentes, setPendentes] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  const [popup, setPopup] = useState({ aberto: false });
   const navigate = useNavigate();
 
   const [edicoesPendentes, setEdicoesPendentes] = useState([
@@ -26,6 +28,7 @@ export default function Admin() {
   const token = localStorage.getItem("access_token");
 
   const getIdFilme = (filme) => filme.id || filme.id_filme;
+  const fecharPopup = () => setPopup({ aberto: false });
 
   const usuarioEhAdmin = useCallback(() => {
     if (!token) return false;
@@ -101,21 +104,42 @@ export default function Admin() {
         if (filmeAprovado) {
           setFilmes([...filmes, { ...filmeAprovado, flag: 1 }]);
         }
-        alert("Filme aprovado com sucesso!");
+        setPopup({
+          aberto: true,
+          tipo: "sucesso",
+          titulo: "Filme aprovado com sucesso",
+          mensagem: "O filme agora aparece no catalogo.",
+          textoConfirmar: "Fechar",
+          onFechar: fecharPopup,
+        });
       } else {
-        alert("Erro ao aprovar o filme.");
+        setPopup({
+          aberto: true,
+          tipo: "erro",
+          titulo: "Erro ao aprovar filme",
+          mensagem: "Nao foi possivel aprovar o filme.",
+          textoConfirmar: "Fechar",
+          onFechar: fecharPopup,
+        });
       }
     } catch (e) {
       console.error(e);
+      setPopup({
+        aberto: true,
+        tipo: "erro",
+        titulo: "Erro ao aprovar filme",
+        mensagem: "Nao foi possivel conectar ao servidor.",
+        textoConfirmar: "Fechar",
+        onFechar: fecharPopup,
+      });
     }
   };
 
 
-  const handleDeletarFilme = async (idFilme, isPendente = false) => {
-    const confirmar = window.confirm("Tem certeza que deseja excluir este filme?");
-    if (!confirmar) return;
-
+  const executarDeletarFilme = async (idFilme, isPendente = false, titulo = "filme") => {
     try {
+      setPopup((atual) => ({ ...atual, carregando: true }));
+
       const resp = await fetch(`http://localhost:8000/filmes/${idFilme}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
@@ -127,12 +151,51 @@ export default function Admin() {
         } else {
           setFilmes(filmes.filter(f => getIdFilme(f) !== idFilme));
         }
+        setPopup({
+          aberto: true,
+          tipo: "sucesso",
+          titulo: "Filme excluido com sucesso",
+          mensagem: `"${titulo}" foi removido do catalogo.`,
+          textoConfirmar: "Fechar",
+          onFechar: fecharPopup,
+        });
       } else {
-        alert("Erro ao excluir filme.");
+        setPopup({
+          aberto: true,
+          tipo: "erro",
+          titulo: "Erro ao excluir filme",
+          mensagem: "Nao foi possivel excluir este filme.",
+          textoConfirmar: "Fechar",
+          onFechar: fecharPopup,
+        });
       }
     } catch (e) {
       console.error(e);
+      setPopup({
+        aberto: true,
+        tipo: "erro",
+        titulo: "Erro ao excluir filme",
+        mensagem: "Nao foi possivel conectar ao servidor.",
+        textoConfirmar: "Fechar",
+        onFechar: fecharPopup,
+      });
     }
+  };
+
+  const handleDeletarFilme = (filme, isPendente = false) => {
+    const idFilme = getIdFilme(filme);
+
+    setPopup({
+      aberto: true,
+      tipo: "confirmacao",
+      titulo: "Certeza que deseja excluir filme?",
+      mensagem: `Esta acao vai remover "${filme.titulo}" do catalogo.`,
+      detalhes: [{ label: "Filme", valor: `${filme.titulo} - ID ${idFilme}` }],
+      textoConfirmar: "Excluir",
+      textoCancelar: "Cancelar",
+      onCancelar: fecharPopup,
+      onConfirmar: () => executarDeletarFilme(idFilme, isPendente, filme.titulo),
+    });
   };
 
   if (carregando) return <div className="admin-loading">Carregando painel...</div>;
@@ -181,7 +244,7 @@ export default function Admin() {
                 <button className="btn-aprovar" onClick={() => handleAprovarFilme(getIdFilme(filme))} title="Aprovar Filme">
                   <Check size={20} strokeWidth={3} />
                 </button>
-                <button className="btn-deletar" onClick={() => handleDeletarFilme(getIdFilme(filme), true)} title="Excluir Filme">
+                <button className="btn-deletar" onClick={() => handleDeletarFilme(filme, true)} title="Excluir Filme">
                   <Trash2 size={20} color="#e03c2f" />
                 </button>
               </div>
@@ -208,7 +271,14 @@ export default function Admin() {
                 </div>
               </div>
               <div className="admin-item-acoes">
-                <button className="btn-aprovar" onClick={() => alert("Edição Aprovada! (Mock)")}>
+                <button className="btn-aprovar" onClick={() => setPopup({
+                  aberto: true,
+                  tipo: "sucesso",
+                  titulo: "Edicao aprovada",
+                  mensagem: "A solicitacao foi aprovada.",
+                  textoConfirmar: "Fechar",
+                  onFechar: fecharPopup,
+                })}>
                   <Check size={20} strokeWidth={3} />
                 </button>
                 <button className="btn-rejeitar" onClick={() => setEdicoesPendentes([])}>
@@ -234,7 +304,7 @@ export default function Admin() {
                 </div>
               </div>
               <div className="admin-item-acoes">
-                <button className="btn-deletar" onClick={() => handleDeletarFilme(getIdFilme(filme), false)} title="Excluir Filme">
+                <button className="btn-deletar" onClick={() => handleDeletarFilme(filme, false)} title="Excluir Filme">
                   <Trash2 size={20} color="#e03c2f" />
                 </button>
               </div>
@@ -243,6 +313,20 @@ export default function Admin() {
         </div>
 
       </div>
+
+      <Popup
+        aberto={popup.aberto}
+        tipo={popup.tipo}
+        titulo={popup.titulo}
+        mensagem={popup.mensagem}
+        detalhes={popup.detalhes}
+        textoConfirmar={popup.textoConfirmar}
+        textoCancelar={popup.textoCancelar}
+        onConfirmar={popup.onConfirmar}
+        onCancelar={popup.onCancelar}
+        onFechar={popup.onFechar}
+        carregando={popup.carregando}
+      />
     </div>
   );
 }

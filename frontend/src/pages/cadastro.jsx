@@ -1,11 +1,27 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, ShieldPlus, User } from "lucide-react";
+import Popup from "../components/popup";
 import LogoSkynis from "../assets/logo Skynis.svg?react";
 import "./css/cadastro.css";
 
+function obterMensagemErro(dados, mensagemPadrao) {
+    if (typeof dados?.detail === "string") return dados.detail;
+    if (Array.isArray(dados?.detail) && dados.detail.length > 0) {
+        return dados.detail.map((erro) => {
+            const campo = erro.loc?.[erro.loc.length - 1];
+            if (campo === "email" && erro.msg?.toLowerCase().includes("email")) {
+                return "Informe um e-mail válido.";
+            }
+            return erro.msg?.replace("Value error, ", "") || mensagemPadrao;
+        }).join("\n");
+    }
+    return dados?.error || mensagemPadrao;
+}
+
 export default function Cadastro() {
     const [nome, setNome] = useState("");
+    const [apelido, setApelido] = useState("");
     const [email, setEmail] = useState("");
     const [senha, setSenha] = useState("");
     const [confirmarSenha, setConfirmarSenha] = useState("");
@@ -13,6 +29,7 @@ export default function Cadastro() {
 
     const [mostrarSenha, setMostrarSenha] = useState(false);
     const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
+    const [popup, setPopup] = useState({ aberto: false });
 
     const navigate = useNavigate();
 
@@ -20,7 +37,14 @@ export default function Cadastro() {
         e.preventDefault();
 
         if (senha !== confirmarSenha) {
-            alert("As senhas não coincidem. Tente novamente!");
+            setPopup({
+                aberto: true,
+                tipo: "aviso",
+                titulo: "Senhas diferentes",
+                mensagem: "As senhas não coincidem. Tente novamente!",
+                textoConfirmar: "Fechar",
+                onFechar: () => setPopup({ aberto: false }),
+            });
             return;
         }
 
@@ -28,20 +52,46 @@ export default function Cadastro() {
             const resposta = await fetch("http://localhost:8000/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ nome, email, senha, role }),
+                body: JSON.stringify({
+                    nome: nome.trim(),
+                    apelido: apelido.trim(),
+                    email: email.trim(),
+                    senha,
+                    role,
+                }),
             });
 
             const dados = await resposta.json();
 
             if (resposta.ok) {
-                alert("Conta criada com sucesso! Faça o login.");
-                navigate("/login");
+                setPopup({
+                    aberto: true,
+                    tipo: "sucesso",
+                    titulo: "Conta criada com sucesso",
+                    mensagem: "Agora faca o login para entrar no Skynis.",
+                    textoConfirmar: "Ir para login",
+                    onFechar: () => navigate("/login"),
+                });
             } else {
-                alert(dados.error || "Erro ao criar conta.");
+                setPopup({
+                    aberto: true,
+                    tipo: "erro",
+                    titulo: "Erro ao criar conta",
+                    mensagem: obterMensagemErro(dados, "Erro ao criar conta."),
+                    textoConfirmar: "Fechar",
+                    onFechar: () => setPopup({ aberto: false }),
+                });
             }
         } catch (erro) {
             console.error("Erro no cadastro:", erro);
-            alert("Erro ao conectar com o servidor.");
+            setPopup({
+                aberto: true,
+                tipo: "erro",
+                titulo: "Erro de conexao",
+                mensagem: "Erro ao conectar com o servidor.",
+                textoConfirmar: "Fechar",
+                onFechar: () => setPopup({ aberto: false }),
+            });
         }
     };
 
@@ -74,6 +124,18 @@ export default function Cadastro() {
                         <div className="grupo-input">
                             <input
                                 type="text"
+                                placeholder="Nome de usuário"
+                                value={apelido}
+                                onChange={(e) => setApelido(e.target.value)}
+                                required
+                            />
+
+                            <User className="icone-input" />
+                        </div>
+
+                        <div className="grupo-input">
+                            <input
+                                type="email"
                                 placeholder="E-mail"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -154,6 +216,15 @@ export default function Cadastro() {
                     </p>
                 </div>
             </main>
+
+            <Popup
+                aberto={popup.aberto}
+                tipo={popup.tipo}
+                titulo={popup.titulo}
+                mensagem={popup.mensagem}
+                textoConfirmar={popup.textoConfirmar}
+                onFechar={popup.onFechar}
+            />
         </div>
     );
 }

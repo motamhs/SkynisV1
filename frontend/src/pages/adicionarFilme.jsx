@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, X } from "lucide-react";
+import Popup from "../components/popup";
 import "./css/adicionarFilme.css";
 
 const API_URL = "http://localhost:8000";
@@ -56,6 +57,7 @@ export default function AdicionarFilme() {
   const [auxiliares, setAuxiliares] = useState(AUXILIARES_VAZIOS);
   const [buscas, setBuscas] = useState({});
   const [salvando, setSalvando] = useState(false);
+  const [popup, setPopup] = useState({ aberto: false });
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -179,11 +181,24 @@ export default function AdicionarFilme() {
       }
 
       const filmeCriado = await resposta.json();
-      alert("Filme salvo com sucesso!");
-      navigate(`/filme/${filmeCriado.id_filme}`);
+      setPopup({
+        aberto: true,
+        tipo: "sucesso",
+        titulo: "Filme salvo com sucesso",
+        mensagem: `"${filmeCriado.titulo}" foi adicionado ao catalogo.`,
+        textoConfirmar: "Ver filme",
+        onFechar: () => navigate(`/filme/${filmeCriado.id_filme}`),
+      });
     } catch (erro) {
       console.error("Erro ao salvar filme:", erro);
-      alert(erro.message || "Erro ao salvar filme.");
+      setPopup({
+        aberto: true,
+        tipo: "erro",
+        titulo: "Erro ao salvar filme",
+        mensagem: erro.message || "Erro ao salvar filme.",
+        textoConfirmar: "Fechar",
+        onFechar: () => setPopup({ aberto: false }),
+      });
     } finally {
       setSalvando(false);
     }
@@ -323,6 +338,15 @@ export default function AdicionarFilme() {
           </button>
         </form>
       </div>
+
+      <Popup
+        aberto={popup.aberto}
+        tipo={popup.tipo}
+        titulo={popup.titulo}
+        mensagem={popup.mensagem}
+        textoConfirmar={popup.textoConfirmar}
+        onFechar={popup.onFechar}
+      />
     </div>
   );
 }
