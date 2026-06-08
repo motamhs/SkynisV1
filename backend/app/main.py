@@ -2,10 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.database import Base, engine
-from app.models import models  # garante que os models sejam registrados
+from app.models import models
 from app.routers import auth, dados, filmes, home, usuarios
 
-# Cria tabelas que ainda não existem (não altera as existentes)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
