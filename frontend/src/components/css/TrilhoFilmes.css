@@ -1,0 +1,21 @@
+.trilho-filmes {
+    margin-bottom: 40px;
+}
+
+.trilho-filmes h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+.grid-filmes {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 40px;
+}
+
+.sem-filmes {
+    color: #888888;
+    grid-column: 1 / -1;
+    margin: 0;
+}

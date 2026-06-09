@@ -1,0 +1,91 @@
+.card-filme {
+    background-color: #1a1a1a;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card-filme:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+.poster-filme {
+    width: 100%;
+    aspect-ratio: 2/3;
+    object-fit: cover;
+}
+
+.card-info {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.card-titulo {
+    font-size: 1.08rem;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-ano {
+    font-size: 0.82rem;
+    color: #888888;
+    margin-bottom: 8px;
+}
+
+.card-avaliacao {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #facc15;
+    font-size: 0.86rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.card-avaliacao small {
+    color: #888888;
+    font-size: 0.74rem;
+    font-weight: 500;
+}
+
+.card-tags {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.tag {
+    background-color: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    color: #cccccc;
+    font-size: 0.72rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+.btn-ver-detalhes-card {
+    margin-top: auto;
+    width: 100%;
+    background-color: #1f0e0d;
+    color: #e03c2f;
+    border: 1px solid #3d1512;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-ver-detalhes-card:hover {
+    background-color: #2a1210;
+}
