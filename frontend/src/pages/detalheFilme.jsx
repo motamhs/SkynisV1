@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Heart, Pencil, Save, Send, User, X } from "lucide-react";
+import { ArrowLeft, Heart, Pencil, Save, Send, Star, User, X } from "lucide-react";
 import Popup from "../components/popup";
 import "./css/detalheFilme.css";
 
 const API_URL = "http://localhost:8000";
 const POSTER_PADRAO = "https://placehold.co/500x750/111111/e03c2f?text=Sem+Poster";
-const FAVORITOS_STORAGE_PREFIX = "filmes_favoritos";
 const AUXILIARES_VAZIOS = {
   atores: [],
   categorias: [],
@@ -55,39 +54,6 @@ const criarFormulario = (filme) => ({
   ids_linguagens: idsDaLista(filme?.linguagens, "id_linguagem"),
   ids_paises: idsDaLista(filme?.paises, "id_pais"),
   ids_produtoras: idsDaLista(filme?.produtoras, "id_produtora"),
-});
-
-const lerFavoritos = () => {
-  try {
-    const dados = JSON.parse(localStorage.getItem(obterChaveFavoritos()) || "[]");
-    return Array.isArray(dados) ? dados : [];
-  } catch {
-    return [];
-  }
-};
-
-const salvarFavoritos = (favoritos) => {
-  localStorage.setItem(obterChaveFavoritos(), JSON.stringify(favoritos));
-};
-
-const obterChaveFavoritos = () => {
-  const token = localStorage.getItem("access_token");
-  if (!token) return FAVORITOS_STORAGE_PREFIX;
-
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return `${FAVORITOS_STORAGE_PREFIX}_${payload.sub}`;
-  } catch {
-    return FAVORITOS_STORAGE_PREFIX;
-  }
-};
-
-const criarFavorito = (filme) => ({
-  id: filme.id || filme.id_filme,
-  titulo: filme.titulo,
-  ano: filme.ano,
-  poster: filme.poster || filme.imagem || POSTER_PADRAO,
-  categorias: filme.categorias || [],
 });
 
 const obterUrlTrailerEmbed = (url) => {
@@ -151,6 +117,9 @@ export default function FilmeDetalhes() {
   const [editando, setEditando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [favoritado, setFavoritado] = useState(false);
+  const [favoritando, setFavoritando] = useState(false);
+  const [avaliacao, setAvaliacao] = useState({ nota_usuario: null, media: 0, total: 0 });
+  const [salvandoAvaliacao, setSalvandoAvaliacao] = useState(false);
   const [form, setForm] = useState(criarFormulario(null));
   const [auxiliares, setAuxiliares] = useState(AUXILIARES_VAZIOS);
   const [buscas, setBuscas] = useState({});
@@ -178,9 +147,35 @@ export default function FilmeDetalhes() {
         const dados = await resposta.json();
         setFilme(dados);
         setForm(criarFormulario(dados));
-        setFavoritado(
-          lerFavoritos().some((favorito) => String(favorito.id) === String(dados.id || dados.id_filme))
-        );
+
+        const token = localStorage.getItem("access_token");
+        const filmeId = dados.id || dados.id_filme;
+
+        if (token && filmeId) {
+          const respostaFavorito = await fetch(`${API_URL}/favoritos/${filmeId}`, {
+            headers: { "Authorization": `Bearer ${token}` },
+          });
+
+          if (respostaFavorito.ok) {
+            const dadosFavorito = await respostaFavorito.json();
+            setFavoritado(Boolean(dadosFavorito.favoritado));
+          } else {
+            setFavoritado(false);
+          }
+
+          const respostaAvaliacao = await fetch(`${API_URL}/filmes/${filmeId}/avaliacao`, {
+            headers: { "Authorization": `Bearer ${token}` },
+          });
+
+          if (respostaAvaliacao.ok) {
+            setAvaliacao(await respostaAvaliacao.json());
+          } else {
+            setAvaliacao({ nota_usuario: null, media: 0, total: 0 });
+          }
+        } else {
+          setFavoritado(false);
+          setAvaliacao({ nota_usuario: null, media: 0, total: 0 });
+        }
       } catch (erroBusca) {
         console.error("Erro ao buscar filme:", erroBusca);
         setFilme(null);
@@ -194,7 +189,8 @@ export default function FilmeDetalhes() {
   }, [id]);
 
   useEffect(() => {
-    if (!admin) return;
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
 
     const buscarAuxiliares = async () => {
       try {
@@ -228,7 +224,7 @@ export default function FilmeDetalhes() {
     };
 
     buscarAuxiliares();
-  }, [admin]);
+  }, []);
 
   useEffect(() => {
     if (!editando) return undefined;
@@ -342,6 +338,16 @@ export default function FilmeDetalhes() {
     setEditando(true);
   };
 
+  const abrirSolicitacaoEdicao = () => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    abrirEdicao();
+  };
+
   const cancelarEdicao = () => {
     setForm(criarFormulario(filme));
     setBuscas({});
@@ -349,20 +355,20 @@ export default function FilmeDetalhes() {
   };
 
   const montarPayloadEdicao = () => ({
-      titulo: form.titulo.trim(),
-      ano: form.ano ? Number(form.ano) : null,
-      duracao: form.duracao.trim() || null,
-      orcamento: form.orcamento ? Number(form.orcamento) : null,
-      sinopse: form.sinopse.trim() || null,
-      poster: form.poster.trim() || null,
-      banner: form.banner.trim() || null,
-      trailer: form.trailer.trim() || null,
-      ids_atores: form.ids_atores.map(Number),
-      ids_categorias: form.ids_categorias.map(Number),
-      ids_diretores: form.ids_diretores.map(Number),
-      ids_linguagens: form.ids_linguagens.map(Number),
-      ids_paises: form.ids_paises.map(Number),
-      ids_produtoras: form.ids_produtoras.map(Number),
+    titulo: form.titulo.trim(),
+    ano: form.ano ? Number(form.ano) : null,
+    duracao: form.duracao.trim() || null,
+    orcamento: form.orcamento ? Number(form.orcamento) : null,
+    sinopse: form.sinopse.trim() || null,
+    poster: form.poster.trim() || null,
+    banner: form.banner.trim() || null,
+    trailer: form.trailer.trim() || null,
+    ids_atores: form.ids_atores.map(Number),
+    ids_categorias: form.ids_categorias.map(Number),
+    ids_diretores: form.ids_diretores.map(Number),
+    ids_linguagens: form.ids_linguagens.map(Number),
+    ids_paises: form.ids_paises.map(Number),
+    ids_produtoras: form.ids_produtoras.map(Number),
   });
 
   const formatarListaPorIds = (campo, itens, campoId) => {
@@ -430,10 +436,10 @@ export default function FilmeDetalhes() {
     setPopup({
       aberto: true,
       tipo: "confirmacao",
-      titulo: "Deseja realmente atualizar este filme?",
+      titulo: admin ? "Deseja realmente atualizar este filme?" : "Deseja enviar esta solicitacao de edicao?",
       mensagem: "Confira as mudanças antes de salvar.",
       detalhes: alteracoes,
-      textoConfirmar: "Atualizar",
+      textoConfirmar: admin ? "Atualizar" : "Enviar",
       textoCancelar: "Voltar",
       onCancelar: () => setPopup({ aberto: false }),
       onConfirmar: () => salvarEdicao(montarPayloadEdicao(), alteracoes),
@@ -451,13 +457,13 @@ export default function FilmeDetalhes() {
       setSalvando(true);
       setPopup((atual) => ({ ...atual, carregando: true }));
 
-      const resposta = await fetch(`${API_URL}/filmes/${id}`, {
-        method: "PATCH",
+      const resposta = await fetch(admin ? `${API_URL}/filmes/${id}` : `${API_URL}/filmes/${id}/solicitar-edicao`, {
+        method: admin ? "PATCH" : "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(admin ? payload : { dados: payload }),
       });
 
       if (!resposta.ok) {
@@ -465,15 +471,19 @@ export default function FilmeDetalhes() {
         throw new Error(erroResposta?.detail || "Erro ao atualizar filme.");
       }
 
-      const filmeAtualizado = await resposta.json();
-      setFilme(filmeAtualizado);
-      setForm(criarFormulario(filmeAtualizado));
+      const dadosResposta = await resposta.json();
+      if (admin) {
+        setFilme(dadosResposta);
+        setForm(criarFormulario(dadosResposta));
+      } else {
+        setForm(criarFormulario(filme));
+      }
       setEditando(false);
       setPopup({
         aberto: true,
         tipo: "sucesso",
-        titulo: "Atualizacao feita com sucesso",
-        mensagem: "O filme foi atualizado no catalogo.",
+        titulo: admin ? "Atualizacao feita com sucesso" : "Solicitacao enviada",
+        mensagem: admin ? "O filme foi atualizado no catalogo." : "Sua edicao foi enviada para um administrador aprovar.",
         detalhes: alteracoes,
         textoConfirmar: "Fechar",
         onFechar: () => setPopup({ aberto: false }),
@@ -493,7 +503,7 @@ export default function FilmeDetalhes() {
     }
   };
 
-  const alternarFavorito = () => {
+  const alternarFavorito = async () => {
     const token = localStorage.getItem("access_token");
     if (!token) {
       navigate("/login");
@@ -501,19 +511,78 @@ export default function FilmeDetalhes() {
     }
 
     const filmeId = filme.id || filme.id_filme;
-    const favoritos = lerFavoritos();
+    if (!filmeId || favoritando) return;
 
-    if (favoritado) {
-      salvarFavoritos(favoritos.filter((favorito) => String(favorito.id) !== String(filmeId)));
-      setFavoritado(false);
+    try {
+      setFavoritando(true);
+
+      const resposta = await fetch(`${API_URL}/favoritos/${filmeId}`, {
+        method: favoritado ? "DELETE" : "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+
+      if (!resposta.ok) {
+        const erroResposta = await resposta.json().catch(() => null);
+        throw new Error(erroResposta?.detail || "Erro ao atualizar favorito.");
+      }
+
+      setFavoritado((atual) => !atual);
+    } catch (erroFavorito) {
+      console.error("Erro ao atualizar favorito:", erroFavorito);
+      setPopup({
+        aberto: true,
+        tipo: "erro",
+        titulo: "Erro ao atualizar favorito",
+        mensagem: erroFavorito.message || "Erro ao atualizar favorito.",
+        textoConfirmar: "Fechar",
+        onFechar: () => setPopup({ aberto: false }),
+      });
+    } finally {
+      setFavoritando(false);
+    }
+  };
+
+  const salvarAvaliacao = async (nota) => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      navigate("/login");
       return;
     }
 
-    salvarFavoritos([
-      criarFavorito(filme),
-      ...favoritos.filter((favorito) => String(favorito.id) !== String(filmeId)),
-    ]);
-    setFavoritado(true);
+    const filmeId = filme.id || filme.id_filme;
+    if (!filmeId || salvandoAvaliacao) return;
+
+    try {
+      setSalvandoAvaliacao(true);
+
+      const resposta = await fetch(`${API_URL}/filmes/${filmeId}/avaliacao`, {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ nota }),
+      });
+
+      if (!resposta.ok) {
+        const erroResposta = await resposta.json().catch(() => null);
+        throw new Error(erroResposta?.detail || "Erro ao salvar avaliacao.");
+      }
+
+      setAvaliacao(await resposta.json());
+    } catch (erroAvaliacao) {
+      console.error("Erro ao salvar avaliacao:", erroAvaliacao);
+      setPopup({
+        aberto: true,
+        tipo: "erro",
+        titulo: "Erro ao salvar avaliacao",
+        mensagem: erroAvaliacao.message || "Erro ao salvar avaliacao.",
+        textoConfirmar: "Fechar",
+        onFechar: () => setPopup({ aberto: false }),
+      });
+    } finally {
+      setSalvandoAvaliacao(false);
+    }
   };
 
   const renderizarSeletorMultiplo = (label, campo, itens, campoId) => {
@@ -639,9 +708,9 @@ export default function FilmeDetalhes() {
             </p>
 
             <div className="detalhes-botoes-acao">
-              <button className={`btn-favoritado${favoritado ? " ativo" : ""}`} onClick={alternarFavorito}>
+              <button className={`btn-favoritado${favoritado ? " ativo" : ""}`} onClick={alternarFavorito} disabled={favoritando}>
                 <Heart size={18} fill={favoritado ? "currentColor" : "none"} />
-                {favoritado ? "Favoritado" : "Favoritar"}
+                {favoritando ? "Salvando..." : favoritado ? "Favoritado" : "Favoritar"}
               </button>
               {admin ? (
                 <button className="btn-solicitar-edicao" onClick={abrirEdicao}>
@@ -649,16 +718,54 @@ export default function FilmeDetalhes() {
                   Editar Filme
                 </button>
               ) : (
-                <button className="btn-solicitar-edicao">
+                <button className="btn-solicitar-edicao" onClick={abrirSolicitacaoEdicao}>
                   <Send size={18} />
                   Solicitar Edicao
                 </button>
               )}
             </div>
 
+            <section className="secao-avaliacao">
+              <div className="avaliacao-resumo">
+                <span className="avaliacao-label">Avaliacao dos usuarios</span>
+                <strong>{Number(avaliacao.media || 0).toFixed(1)}</strong>
+                <span>{avaliacao.total} {avaliacao.total === 1 ? "voto" : "votos"}</span>
+              </div>
+
+              <div className="avaliacao-voto">
+                <span>Sua nota</span>
+                <button
+                  type="button"
+                  className={`btn-nota-zero${avaliacao.nota_usuario === 0 ? " ativo" : ""}`}
+                  onClick={() => salvarAvaliacao(0)}
+                  disabled={salvandoAvaliacao}
+                  title="Dar 0 estrelas"
+                >
+                  0
+                </button>
+                {[1, 2, 3, 4, 5].map((nota) => (
+                  <button
+                    key={nota}
+                    type="button"
+                    className={`btn-estrela${Number(avaliacao.nota_usuario) >= nota ? " ativa" : ""}`}
+                    onClick={() => salvarAvaliacao(nota)}
+                    disabled={salvandoAvaliacao}
+                    title={`${nota} ${nota === 1 ? "estrela" : "estrelas"}`}
+                  >
+                    <Star size={22} fill={Number(avaliacao.nota_usuario) >= nota ? "currentColor" : "none"} />
+                  </button>
+                ))}
+                <small>
+                  {avaliacao.nota_usuario === null || avaliacao.nota_usuario === undefined
+                    ? "Voce ainda nao avaliou"
+                    : `Voce avaliou com ${avaliacao.nota_usuario}`}
+                </small>
+              </div>
+            </section>
 
 
-            {admin && editando && (
+
+            {editando && (
               <div
                 className="modal-edicao-overlay"
                 role="dialog"
@@ -674,7 +781,7 @@ export default function FilmeDetalhes() {
                   onMouseDown={(event) => event.stopPropagation()}
                 >
                   <div className="form-edicao-header">
-                    <h2 id="titulo-modal-edicao">Editar dados do filme</h2>
+                    <h2 id="titulo-modal-edicao">{admin ? "Editar dados do filme" : "Solicitar edicao do filme"}</h2>
                     <button type="button" className="btn-cancelar-edicao" onClick={cancelarEdicao}>
                       <X size={18} />
                       Cancelar
@@ -732,7 +839,7 @@ export default function FilmeDetalhes() {
 
                   <button type="submit" className="btn-salvar-edicao" disabled={salvando}>
                     <Save size={18} />
-                    {salvando ? "Salvando..." : "Salvar alteracoes"}
+                    {salvando ? "Salvando..." : admin ? "Salvar alteracoes" : "Enviar solicitacao"}
                   </button>
                 </form>
               </div>
@@ -779,7 +886,7 @@ export default function FilmeDetalhes() {
               </div>
             </div>
 
-                        {trailerEmbed && (
+            {trailerEmbed && (
               <section className="secao-trailer">
                 <h2>Trailer</h2>
                 <div className="trailer-container">
@@ -814,10 +921,10 @@ export default function FilmeDetalhes() {
                   <p className="elenco-vazio">Elenco nao informado.</p>
                 )}
 
-                
+
               </div>
 
-              
+
             </div>
           </div>
         </div>

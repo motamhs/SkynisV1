@@ -1,33 +1,42 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, Clock, Film, Pencil, Trash2, X } from "lucide-react";
 import Popup from "../components/popup";
 import "./css/pageadm.css";
 
+const API_URL = "http://localhost:8000";
+const POSTER_PADRAO = "https://placehold.co/160x240/111111/e03c2f?text=Sem+Poster";
+
+const getIdFilme = (filme) => filme?.id || filme?.id_filme;
+
+const formatarData = (valor) => {
+  if (!valor) return "";
+  const data = new Date(valor);
+  return Number.isNaN(data.getTime()) ? "" : data.toLocaleDateString("pt-BR");
+};
+
+const formatarValor = (valor) => {
+  if (Array.isArray(valor)) return valor.join(", ");
+  if (valor === null || valor === undefined || valor === "") return "Vazio";
+  if (typeof valor === "object") return JSON.stringify(valor);
+  return String(valor);
+};
+
+const obterResumoEdicao = (dados) =>
+  Object.entries(dados || {}).map(([campo, valor]) => ({
+    campo,
+    valor: formatarValor(valor),
+  }));
+
 export default function Admin() {
   const [filmes, setFilmes] = useState([]);
   const [pendentes, setPendentes] = useState([]);
+  const [edicoesPendentes, setEdicoesPendentes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [popup, setPopup] = useState({ aberto: false });
   const navigate = useNavigate();
-
-  const [edicoesPendentes, setEdicoesPendentes] = useState([
-    {
-      id: 1,
-      filme_id: 10,
-      titulo: "Cavaleiro das Trevas",
-      solicitante: "Victor Silva",
-      data: "15/04/2026",
-      campo: "Custos",
-      valor_antigo: "$ 245 Milhoes",
-      valor_novo: "$ 250 Milhões",
-      poster: "https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg"
-    }
-  ]);
-
   const token = localStorage.getItem("access_token");
 
-  const getIdFilme = (filme) => filme.id || filme.id_filme;
   const fecharPopup = () => setPopup({ aberto: false });
 
   const usuarioEhAdmin = useCallback(() => {
@@ -46,6 +55,41 @@ export default function Admin() {
     }
   }, [token]);
 
+  const buscarDadosAdmin = useCallback(async () => {
+    try {
+      setCarregando(true);
+
+      const [respFilmes, respPendentes, respEdicoes] = await Promise.all([
+        fetch(`${API_URL}/filmes`),
+        fetch(`${API_URL}/filmes/pendentes`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        }),
+        fetch(`${API_URL}/filmes/edicoes/pendentes`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        }),
+      ]);
+
+      if (respFilmes.ok) {
+        const dadosFilmes = await respFilmes.json();
+        setFilmes(dadosFilmes.filter((filme) => filme.flag === 1 || filme.flag === true));
+      }
+
+      if (respPendentes.ok) {
+        setPendentes(await respPendentes.json());
+      } else if (respPendentes.status === 401 || respPendentes.status === 403) {
+        navigate("/");
+      }
+
+      if (respEdicoes.ok) {
+        setEdicoesPendentes(await respEdicoes.json());
+      }
+    } catch (erro) {
+      console.error("Erro ao buscar dados do painel:", erro);
+    } finally {
+      setCarregando(false);
+    }
+  }, [navigate, token]);
+
   useEffect(() => {
     if (!token) {
       navigate("/login");
@@ -57,125 +101,75 @@ export default function Admin() {
       return;
     }
 
-    const buscarDadosAdmin = async () => {
-      try {
-        const [respFilmes, respPendentes] = await Promise.all([
-          fetch("http://localhost:8000/filmes"),
-          fetch("http://localhost:8000/filmes/pendentes", {
-            headers: { "Authorization": `Bearer ${token}` }
-          })
-        ]);
-
-        if (respFilmes.ok) {
-          const dadosFilmes = await respFilmes.json();
-
-          setFilmes(dadosFilmes.filter(f => f.flag === 1 || f.flag === true)); 
-        }
-
-        if (respPendentes.ok) {
-          const dadosPendentes = await respPendentes.json();
-          setPendentes(dadosPendentes);
-        } else if (respPendentes.status === 401 || respPendentes.status === 403) {
-   
-          navigate("/");
-        }
-      } catch (erro) {
-        console.error("Erro ao buscar dados do painel:", erro);
-      } finally {
-        setCarregando(false);
-      }
-    };
-
     buscarDadosAdmin();
-  }, [token, navigate, usuarioEhAdmin]);
-
+  }, [token, navigate, usuarioEhAdmin, buscarDadosAdmin]);
 
   const handleAprovarFilme = async (idFilme) => {
     try {
-      const resp = await fetch(`http://localhost:8000/filmes/${idFilme}/aprovar`, {
+      const resp = await fetch(`${API_URL}/filmes/${idFilme}/aprovar`, {
         method: "PUT",
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { "Authorization": `Bearer ${token}` },
       });
 
-      if (resp.ok) {
-   
-        const filmeAprovado = pendentes.find(f => getIdFilme(f) === idFilme);
-        setPendentes(pendentes.filter(f => getIdFilme(f) !== idFilme));
-        if (filmeAprovado) {
-          setFilmes([...filmes, { ...filmeAprovado, flag: 1 }]);
-        }
-        setPopup({
-          aberto: true,
-          tipo: "sucesso",
-          titulo: "Filme aprovado com sucesso",
-          mensagem: "O filme agora aparece no catalogo.",
-          textoConfirmar: "Fechar",
-          onFechar: fecharPopup,
-        });
-      } else {
-        setPopup({
-          aberto: true,
-          tipo: "erro",
-          titulo: "Erro ao aprovar filme",
-          mensagem: "Nao foi possivel aprovar o filme.",
-          textoConfirmar: "Fechar",
-          onFechar: fecharPopup,
-        });
-      }
-    } catch (e) {
-      console.error(e);
+      if (!resp.ok) throw new Error("Nao foi possivel aprovar o filme.");
+
+      const filmeAprovado = pendentes.find((filme) => getIdFilme(filme) === idFilme);
+      setPendentes((atuais) => atuais.filter((filme) => getIdFilme(filme) !== idFilme));
+      if (filmeAprovado) setFilmes((atuais) => [...atuais, { ...filmeAprovado, flag: true }]);
+
+      setPopup({
+        aberto: true,
+        tipo: "sucesso",
+        titulo: "Filme aprovado com sucesso",
+        mensagem: "O filme agora aparece no catalogo.",
+        textoConfirmar: "Fechar",
+        onFechar: fecharPopup,
+      });
+    } catch (erro) {
+      console.error(erro);
       setPopup({
         aberto: true,
         tipo: "erro",
         titulo: "Erro ao aprovar filme",
-        mensagem: "Nao foi possivel conectar ao servidor.",
+        mensagem: erro.message || "Nao foi possivel aprovar o filme.",
         textoConfirmar: "Fechar",
         onFechar: fecharPopup,
       });
     }
   };
 
-
   const executarDeletarFilme = async (idFilme, isPendente = false, titulo = "filme") => {
     try {
       setPopup((atual) => ({ ...atual, carregando: true }));
 
-      const resp = await fetch(`http://localhost:8000/filmes/${idFilme}`, {
+      const resp = await fetch(`${API_URL}/filmes/${idFilme}`, {
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { "Authorization": `Bearer ${token}` },
       });
 
-      if (resp.ok) {
-        if (isPendente) {
-          setPendentes(pendentes.filter(f => getIdFilme(f) !== idFilme));
-        } else {
-          setFilmes(filmes.filter(f => getIdFilme(f) !== idFilme));
-        }
-        setPopup({
-          aberto: true,
-          tipo: "sucesso",
-          titulo: "Filme excluido com sucesso",
-          mensagem: `"${titulo}" foi removido do catalogo.`,
-          textoConfirmar: "Fechar",
-          onFechar: fecharPopup,
-        });
+      if (!resp.ok) throw new Error("Nao foi possivel excluir este filme.");
+
+      if (isPendente) {
+        setPendentes((atuais) => atuais.filter((filme) => getIdFilme(filme) !== idFilme));
       } else {
-        setPopup({
-          aberto: true,
-          tipo: "erro",
-          titulo: "Erro ao excluir filme",
-          mensagem: "Nao foi possivel excluir este filme.",
-          textoConfirmar: "Fechar",
-          onFechar: fecharPopup,
-        });
+        setFilmes((atuais) => atuais.filter((filme) => getIdFilme(filme) !== idFilme));
       }
-    } catch (e) {
-      console.error(e);
+
+      setPopup({
+        aberto: true,
+        tipo: "sucesso",
+        titulo: "Filme excluido com sucesso",
+        mensagem: `"${titulo}" foi removido do catalogo.`,
+        textoConfirmar: "Fechar",
+        onFechar: fecharPopup,
+      });
+    } catch (erro) {
+      console.error(erro);
       setPopup({
         aberto: true,
         tipo: "erro",
         titulo: "Erro ao excluir filme",
-        mensagem: "Nao foi possivel conectar ao servidor.",
+        mensagem: erro.message || "Nao foi possivel excluir este filme.",
         textoConfirmar: "Fechar",
         onFechar: fecharPopup,
       });
@@ -198,6 +192,66 @@ export default function Admin() {
     });
   };
 
+  const analisarEdicao = async (edicao, acao) => {
+    try {
+      const resp = await fetch(`${API_URL}/filmes/edicoes/${edicao.id_solicitacao}/${acao}`, {
+        method: "PUT",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+
+      if (!resp.ok) {
+        const erroResposta = await resp.json().catch(() => null);
+        throw new Error(erroResposta?.detail || "Nao foi possivel analisar a solicitacao.");
+      }
+
+      setEdicoesPendentes((atuais) =>
+        atuais.filter((item) => item.id_solicitacao !== edicao.id_solicitacao)
+      );
+
+      if (acao === "aprovar") buscarDadosAdmin();
+
+      setPopup({
+        aberto: true,
+        tipo: "sucesso",
+        titulo: acao === "aprovar" ? "Edicao aprovada" : "Edicao rejeitada",
+        mensagem: acao === "aprovar"
+          ? "A solicitacao foi aplicada ao filme."
+          : "A solicitacao foi marcada como rejeitada.",
+        textoConfirmar: "Fechar",
+        onFechar: fecharPopup,
+      });
+    } catch (erro) {
+      console.error(erro);
+      setPopup({
+        aberto: true,
+        tipo: "erro",
+        titulo: "Erro ao analisar edicao",
+        mensagem: erro.message || "Nao foi possivel analisar a solicitacao.",
+        textoConfirmar: "Fechar",
+        onFechar: fecharPopup,
+      });
+    }
+  };
+
+  const confirmarAnaliseEdicao = (edicao, acao) => {
+    const detalhes = obterResumoEdicao(edicao.dados).map((item) => ({
+      label: item.campo,
+      valor: item.valor,
+    }));
+
+    setPopup({
+      aberto: true,
+      tipo: "confirmacao",
+      titulo: acao === "aprovar" ? "Aprovar solicitacao de edicao?" : "Rejeitar solicitacao de edicao?",
+      mensagem: `Filme: ${edicao.filme?.titulo || "Nao informado"}`,
+      detalhes,
+      textoConfirmar: acao === "aprovar" ? "Aprovar" : "Rejeitar",
+      textoCancelar: "Cancelar",
+      onCancelar: fecharPopup,
+      onConfirmar: () => analisarEdicao(edicao, acao),
+    });
+  };
+
   if (carregando) return <div className="admin-loading">Carregando painel...</div>;
 
   return (
@@ -205,14 +259,13 @@ export default function Admin() {
       <div className="admin-container">
         <h1 className="admin-titulo-secao">Painel Administrativo</h1>
 
-  
         <div className="admin-resumo-grid">
           <div className="admin-card-resumo">
             <Film size={32} color="#e03c2f" />
             <h2>{filmes.length}</h2>
             <p>Total de Filmes</p>
           </div>
-          
+
           <div className="admin-card-resumo">
             <Clock size={32} color="#eab308" />
             <h2>{pendentes.length}</h2>
@@ -222,22 +275,21 @@ export default function Admin() {
           <div className="admin-card-resumo">
             <Pencil size={32} color="#3b82f6" />
             <h2>{edicoesPendentes.length}</h2>
-            <p>Edições Pendentes</p>
+            <p>Edicoes Pendentes</p>
           </div>
         </div>
-
 
         <h2 className="admin-titulo-secao">Filmes Pendentes</h2>
         <div className="admin-lista-vertical">
           {pendentes.length === 0 ? <p className="admin-vazio">Nenhum filme pendente.</p> : null}
 
-          {pendentes.map(filme => (
+          {pendentes.map((filme) => (
             <div key={`pendente-${getIdFilme(filme)}`} className="admin-item-lista">
               <div className="admin-item-info">
-                <img src={filme.imagem || filme.poster} alt={filme.titulo} className="admin-item-poster" />
+                <img src={filme.imagem || filme.poster || POSTER_PADRAO} alt={filme.titulo} className="admin-item-poster" />
                 <div className="admin-textos">
                   <h3>{filme.titulo}</h3>
-                  <p>{filme.ano} • ID: {getIdFilme(filme)}</p>
+                  <p>{filme.ano} - ID: {getIdFilme(filme)}</p>
                 </div>
               </div>
               <div className="admin-item-acoes">
@@ -252,36 +304,31 @@ export default function Admin() {
           ))}
         </div>
 
-
         <h2 className="admin-titulo-secao">Solicitações de Edição</h2>
         <div className="admin-lista-vertical">
-          {edicoesPendentes.length === 0 ? <p className="admin-vazio">Nenhuma edição pendente.</p> : null}
+          {edicoesPendentes.length === 0 ? <p className="admin-vazio">Nenhuma edicao pendente.</p> : null}
 
-          {edicoesPendentes.map(edicao => (
-            <div key={`ed-${edicao.id}`} className="admin-item-lista">
+          {edicoesPendentes.map((edicao) => (
+            <div key={`ed-${edicao.id_solicitacao}`} className="admin-item-lista">
               <div className="admin-item-info">
-                <img src={edicao.poster} alt={edicao.titulo} className="admin-item-poster" />
+                <img src={edicao.filme?.poster || edicao.filme?.imagem || POSTER_PADRAO} alt={edicao.filme?.titulo} className="admin-item-poster" />
                 <div className="admin-textos">
-                  <h3>{edicao.titulo}</h3>
-                  <p className="admin-subtexto">por {edicao.solicitante} • {edicao.data}</p>
-                  <p className="admin-subtexto">campo: <span>{edicao.campo}</span></p>
-                  <p className="admin-comparacao">
-                    <span className="valor-antigo">{edicao.valor_antigo}</span> - <span className="valor-novo">{edicao.valor_novo}</span>
+                  <h3>{edicao.filme?.titulo || "Filme nao informado"}</h3>
+                  <p className="admin-subtexto">
+                    por {edicao.usuario?.apelido || edicao.usuario?.nome || "usuario"} {formatarData(edicao.data_criacao)}
                   </p>
+                  {obterResumoEdicao(edicao.dados).slice(0, 3).map((item) => (
+                    <p key={item.campo} className="admin-subtexto">
+                      {item.campo}: <span>{item.valor}</span>
+                    </p>
+                  ))}
                 </div>
               </div>
               <div className="admin-item-acoes">
-                <button className="btn-aprovar" onClick={() => setPopup({
-                  aberto: true,
-                  tipo: "sucesso",
-                  titulo: "Edicao aprovada",
-                  mensagem: "A solicitacao foi aprovada.",
-                  textoConfirmar: "Fechar",
-                  onFechar: fecharPopup,
-                })}>
+                <button className="btn-aprovar" onClick={() => confirmarAnaliseEdicao(edicao, "aprovar")} title="Aprovar Edicao">
                   <Check size={20} strokeWidth={3} />
                 </button>
-                <button className="btn-rejeitar" onClick={() => setEdicoesPendentes([])}>
+                <button className="btn-rejeitar" onClick={() => confirmarAnaliseEdicao(edicao, "rejeitar")} title="Rejeitar Edicao">
                   <X size={20} strokeWidth={3} />
                 </button>
               </div>
@@ -289,18 +336,17 @@ export default function Admin() {
           ))}
         </div>
 
-
         <h2 className="admin-titulo-secao">Todos os Filmes</h2>
         <div className="admin-lista-vertical">
           {filmes.length === 0 ? <p className="admin-vazio">Nenhum filme catalogado.</p> : null}
 
-          {filmes.map(filme => (
+          {filmes.map((filme) => (
             <div key={`all-${getIdFilme(filme)}`} className="admin-item-lista">
               <div className="admin-item-info">
-                <img src={filme.imagem || filme.poster} alt={filme.titulo} className="admin-item-poster" />
+                <img src={filme.imagem || filme.poster || POSTER_PADRAO} alt={filme.titulo} className="admin-item-poster" />
                 <div className="admin-textos">
                   <h3>{filme.titulo}</h3>
-                  <p>{filme.ano} • ID: {getIdFilme(filme)}</p>
+                  <p>{filme.ano} - ID: {getIdFilme(filme)}</p>
                 </div>
               </div>
               <div className="admin-item-acoes">
@@ -311,7 +357,6 @@ export default function Admin() {
             </div>
           ))}
         </div>
-
       </div>
 
       <Popup

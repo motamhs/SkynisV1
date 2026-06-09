@@ -4,28 +4,8 @@ import { Heart, Mail, Pencil, Save, User, X } from "lucide-react";
 import Popup from "../components/popup";
 import "./css/perfil.css";
 
-const FAVORITOS_STORAGE_PREFIX = "filmes_favoritos";
-
-const lerFavoritos = () => {
-  try {
-    const dados = JSON.parse(localStorage.getItem(obterChaveFavoritos()) || "[]");
-    return Array.isArray(dados) ? dados : [];
-  } catch {
-    return [];
-  }
-};
-
-const obterChaveFavoritos = () => {
-  const token = localStorage.getItem("access_token");
-  if (!token) return FAVORITOS_STORAGE_PREFIX;
-
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return `${FAVORITOS_STORAGE_PREFIX}_${payload.sub}`;
-  } catch {
-    return FAVORITOS_STORAGE_PREFIX;
-  }
-};
+const API_URL = "http://localhost:8000";
+const POSTER_PADRAO = "https://placehold.co/500x750/111111/e03c2f?text=Sem+Poster";
 
 const criarFormPerfil = (usuario) => ({
   nome: usuario?.nome || "",
@@ -40,6 +20,45 @@ const formatarValorPopup = (valor) => {
   return texto.length > 100 ? `${texto.slice(0, 97)}...` : texto;
 };
 
+const formatarValorSolicitacao = (valor) => {
+  if (Array.isArray(valor)) return valor.join(", ");
+  if (valor === null || valor === undefined || valor === "") return "Vazio";
+  if (typeof valor === "object") return JSON.stringify(valor);
+  return String(valor);
+};
+
+const resumirSolicitacao = (dados) => {
+  const alteracoes = Object.entries(dados || {}).map(([campo, valor]) => (
+    `${campo}: ${formatarValorSolicitacao(valor)}`
+  ));
+
+  return alteracoes.length > 0 ? alteracoes.slice(0, 3).join(" | ") : "Sem detalhes";
+};
+
+const textoStatus = (status) => {
+  if (status === "aprovada") return "Aprovada";
+  if (status === "rejeitada") return "Rejeitada";
+  return "Pendente";
+};
+
+const usuarioEhAdmin = () => {
+  const token = localStorage.getItem("access_token");
+  if (!token) return false;
+
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload.role === "admin";
+  } catch {
+    return false;
+  }
+};
+
+const textoStatusAdicao = (status) => {
+  if (status === "aprovada") return "Aprovado";
+  if (status === "rejeitada") return "Rejeitado";
+  return "Pendente";
+};
+
 export default function Perfil() {
   const navigate = useNavigate();
   const [usuario, setUsuario] = useState({
@@ -52,7 +71,13 @@ export default function Perfil() {
   const [editandoPerfil, setEditandoPerfil] = useState(false);
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [popup, setPopup] = useState({ aberto: false });
-  const [filmesFavoritos] = useState(() => lerFavoritos());
+  const [filmesFavoritos, setFilmesFavoritos] = useState([]);
+  const [carregandoFavoritos, setCarregandoFavoritos] = useState(true);
+  const [solicitacoesEdicao, setSolicitacoesEdicao] = useState([]);
+  const [carregandoSolicitacoes, setCarregandoSolicitacoes] = useState(true);
+  const [solicitacoesAdicao, setSolicitacoesAdicao] = useState([]);
+  const [carregandoAdicoes, setCarregandoAdicoes] = useState(true);
+  const admin = usuarioEhAdmin();
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -63,7 +88,7 @@ export default function Perfil() {
 
     const buscarDadosUsuario = async () => {
       try {
-        const resposta = await fetch("http://localhost:8000/usuarios/me", {
+        const resposta = await fetch(`${API_URL}/usuarios/me`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
 
@@ -88,7 +113,73 @@ export default function Perfil() {
       }
     };
 
+    const buscarFavoritos = async () => {
+      try {
+        setCarregandoFavoritos(true);
+
+        const resposta = await fetch(`${API_URL}/favoritos`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+
+        if (!resposta.ok) {
+          throw new Error("Erro ao buscar favoritos.");
+        }
+
+        setFilmesFavoritos(await resposta.json());
+      } catch (erro) {
+        console.error("Erro ao buscar favoritos:", erro);
+        setFilmesFavoritos([]);
+      } finally {
+        setCarregandoFavoritos(false);
+      }
+    };
+
+    const buscarSolicitacoes = async () => {
+      try {
+        setCarregandoSolicitacoes(true);
+
+        const resposta = await fetch(`${API_URL}/filmes/edicoes/minhas`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+
+        if (!resposta.ok) {
+          throw new Error("Erro ao buscar solicitacoes.");
+        }
+
+        setSolicitacoesEdicao(await resposta.json());
+      } catch (erro) {
+        console.error("Erro ao buscar solicitacoes:", erro);
+        setSolicitacoesEdicao([]);
+      } finally {
+        setCarregandoSolicitacoes(false);
+      }
+    };
+
+    const buscarAdicoes = async () => {
+      try {
+        setCarregandoAdicoes(true);
+
+        const resposta = await fetch(`${API_URL}/filmes/minhas-adicoes`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+
+        if (!resposta.ok) {
+          throw new Error("Erro ao buscar solicitacoes de adicao.");
+        }
+
+        setSolicitacoesAdicao(await resposta.json());
+      } catch (erro) {
+        console.error("Erro ao buscar solicitacoes de adicao:", erro);
+        setSolicitacoesAdicao([]);
+      } finally {
+        setCarregandoAdicoes(false);
+      }
+    };
+
     buscarDadosUsuario();
+    buscarFavoritos();
+    buscarSolicitacoes();
+    buscarAdicoes();
   }, [navigate]);
 
   const fecharPopup = () => setPopup({ aberto: false });
@@ -181,7 +272,7 @@ export default function Perfil() {
       setSalvandoPerfil(true);
       setPopup((atual) => ({ ...atual, carregando: true }));
 
-      const resposta = await fetch("http://localhost:8000/usuarios/me", {
+      const resposta = await fetch(`${API_URL}/usuarios/me`, {
         method: "PATCH",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -237,10 +328,6 @@ export default function Perfil() {
       </span>
     ));
   };
-
-  const solicitacoes = [
-    { id: 101, titulo: "Cavaleiro das Trevas", detalhes: "$ 245 Milhoes - $ 250 Milhões", status: "Pendente", imagem: "https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg" }
-  ];
 
   return (
     <div className="pagina-perfil">
@@ -315,10 +402,14 @@ export default function Perfil() {
         <section className="secao-perfil">
           <h3>Filmes Favoritos ({filmesFavoritos.length})</h3>
           <div className="grid-favoritos">
-            {filmesFavoritos.length > 0 ? filmesFavoritos.map((filme) => (
-              <div key={`fav-${filme.id}`} className="card-filme-favorito">
+            {carregandoFavoritos ? (
+              <p className="favoritos-vazio">Carregando favoritos...</p>
+            ) : filmesFavoritos.length > 0 ? filmesFavoritos.map((filme) => {
+              const filmeId = filme.id || filme.id_filme;
+              return (
+              <div key={`fav-${filmeId}`} className="card-filme-favorito">
                 <div className="poster-container">
-                  <img src={filme.poster} alt={filme.titulo} className="poster-filme" />
+                  <img src={filme.poster || filme.imagem || POSTER_PADRAO} alt={filme.titulo} className="poster-filme" />
 
                   <div className="icone-coracao">
                     <Heart size={16} color="#e03c2f" fill="#e03c2f" />
@@ -332,36 +423,76 @@ export default function Perfil() {
                   </div>
                   <button
                     className="btn-ver-detalhes-card"
-                    onClick={() => navigate(`/filme/${filme.id}`)}
+                    onClick={() => navigate(`/filme/${filmeId}`)}
                   >
                     Ver detalhes
                   </button>
                 </div>
               </div>
-            )) : (
+            );
+            }) : (
               <p className="favoritos-vazio">Nenhum filme favoritado ainda.</p>
             )}
           </div>
         </section>
 
 
+        {!admin && (
         <section className="secao-perfil">
-          <h3>Solicitações de Edição ({solicitacoes.length})</h3>
+          <h3>Solicitacoes de Adicao ({solicitacoesAdicao.length})</h3>
           <div className="lista-solicitacoes">
-            {solicitacoes.map((solic) => (
-              <div key={solic.id} className="card-solicitacao">
+            {carregandoAdicoes ? (
+              <p className="favoritos-vazio">Carregando solicitacoes de adicao...</p>
+            ) : solicitacoesAdicao.length > 0 ? solicitacoesAdicao.map((solic) => {
+              const filme = solic.filme || {};
+              const filmeId = filme.id || filme.id_filme;
+              const status = textoStatusAdicao(solic.status);
+              return (
+              <div key={`add-${solic.id_solicitacao || filmeId}`} className="card-solicitacao">
                 <div className="info-solicitacao-esquerda">
-                  <img src={solic.imagem} alt={solic.titulo} className="thumb-solicitacao" />
+                  <img src={filme.poster || filme.imagem || POSTER_PADRAO} alt={filme.titulo || "Filme"} className="thumb-solicitacao" />
                   <div className="textos-solicitacao">
-                    <h4>{solic.titulo}</h4>
-                    <p>{solic.detalhes}</p>
+                    <h4>{filme.titulo || "Filme nao informado"}</h4>
+                    <p>{filme.ano || "Ano nao informado"}</p>
                   </div>
                 </div>
                 <div className="status-solicitacao">
-                  <span className="badge-pendente">{solic.status}</span>
+                  <span className={`badge-pendente ${status === "Aprovado" ? "badge-aprovada" : status === "Rejeitado" ? "badge-rejeitada" : ""}`}>{status}</span>
                 </div>
               </div>
-            ))}
+            );
+            }) : (
+              <p className="favoritos-vazio">Nenhuma solicitacao de adicao enviada.</p>
+            )}
+          </div>
+        </section>
+        )}
+
+
+        <section className="secao-perfil">
+          <h3>Solicitacoes de Edicao ({solicitacoesEdicao.length})</h3>
+          <div className="lista-solicitacoes">
+            {carregandoSolicitacoes ? (
+              <p className="favoritos-vazio">Carregando solicitacoes...</p>
+            ) : solicitacoesEdicao.length > 0 ? solicitacoesEdicao.map((solic) => {
+              const filme = solic.filme || {};
+              return (
+              <div key={solic.id_solicitacao} className="card-solicitacao">
+                <div className="info-solicitacao-esquerda">
+                  <img src={filme.poster || filme.imagem || POSTER_PADRAO} alt={filme.titulo || "Filme"} className="thumb-solicitacao" />
+                  <div className="textos-solicitacao">
+                    <h4>{filme.titulo || "Filme nao informado"}</h4>
+                    <p>{resumirSolicitacao(solic.dados)}</p>
+                  </div>
+                </div>
+                <div className="status-solicitacao">
+                  <span className={`badge-pendente badge-${solic.status || "pendente"}`}>{textoStatus(solic.status)}</span>
+                </div>
+              </div>
+            );
+            }) : (
+              <p className="favoritos-vazio">Nenhuma solicitacao de edicao enviada.</p>
+            )}
           </div>
         </section>
 
@@ -383,3 +514,4 @@ export default function Perfil() {
     </div>
   );
 }
+

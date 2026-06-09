@@ -5,10 +5,10 @@ import "./css/navbar.css";
 import LogoSkynis from "../assets/logo Skynis.svg?react";
 
 const paginas = [
-  { chave: "inicio",  rotulo: "Inicio",  icone: <Home />, roles: [null, "usuario", "admin"] },
-  { chave: "filmes",  rotulo: "Filmes",  icone: <Film />,  roles: [null, "usuario", "admin"] },
-  { chave: "perfil",  rotulo: "Perfil",  icone: <User />, roles: ["usuario", "admin"] },
-  { chave: "admin",   rotulo: "Admin",   icone: <Shield />,  roles: ["admin"] },
+  { chave: "inicio", rotulo: "Inicio", icone: <Home />, roles: [null, "usuario", "admin"] },
+  { chave: "filmes", rotulo: "Filmes", icone: <Film />, roles: [null, "usuario", "admin"] },
+  { chave: "perfil", rotulo: "Perfil", icone: <User />, roles: ["usuario", "admin"] },
+  { chave: "admin", rotulo: "Admin", icone: <Shield />, roles: ["admin"] },
 ];
 
 export default function Navbar({ role = null, aoNavegar, aoSair }) {
@@ -28,11 +28,11 @@ export default function Navbar({ role = null, aoNavegar, aoSair }) {
 
   const navegar = (chave) => {
     aoNavegar?.(chave);
-    
+
     if (chave === "inicio") {
-      navigate("/"); 
+      navigate("/");
     } else {
-      navigate(`/${chave}`); 
+      navigate(`/${chave}`);
     }
   };
 
@@ -66,7 +66,7 @@ export default function Navbar({ role = null, aoNavegar, aoSair }) {
           </button>
         )}
 
-        {role === "admin" && (
+        {(role === "usuario" || role === "admin") && (
           <button className={`botao botao-adicionar${ativa === "adicionar" ? " ativo" : ""}`} onClick={() => navegar("adicionar")}>
             + Adicionar
           </button>

@@ -26,7 +26,6 @@ export default function Cadastro() {
     const [senha, setSenha] = useState("");
     const [confirmarSenha, setConfirmarSenha] = useState("");
     const [role, setRole] = useState("user");
-
     const [mostrarSenha, setMostrarSenha] = useState(false);
     const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
     const [popup, setPopup] = useState({ aberto: false });

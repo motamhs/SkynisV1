@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play } from "lucide-react";
+import { Play, Star } from "lucide-react";
 import "./css/home.css";
 
 export default function Home() {
     const [filmes, setFilmes] = useState([]);
+    const [melhoresClassificados, setMelhoresClassificados] = useState([]);
+    const [novidades, setNovidades] = useState([]);
     const [indiceHero, setIndiceHero] = useState(0);
     const [carregando, setCarregando] = useState(true);
     const navigate = useNavigate();
@@ -12,12 +14,24 @@ export default function Home() {
     useEffect(() => {
         const buscarFilmes = async () => {
             try {
-                const resposta = await fetch("http://localhost:8000/filmes");
+                const [resposta, respMelhores, respNovidades] = await Promise.all([
+                    fetch("http://localhost:8000/filmes"),
+                    fetch("http://localhost:8000/filmes/rankings/melhores?limit=6"),
+                    fetch("http://localhost:8000/filmes/rankings/novidades?limit=6"),
+                ]);
+
                 if (resposta.ok) {
                     const dados = await resposta.json();
-                    
                     const aprovados = dados.filter(f => f.flag === true || f.flag === 1);
                     setFilmes(aprovados);
+                }
+
+                if (respMelhores.ok) {
+                    setMelhoresClassificados(await respMelhores.json());
+                }
+
+                if (respNovidades.ok) {
+                    setNovidades(await respNovidades.json());
                 }
             } catch (erro) {
                 console.error("Erro ao buscar filmes:", erro);
@@ -91,7 +105,36 @@ export default function Home() {
     const filmesHero = filmes.slice(0, 5);
     const indiceHeroSeguro = filmesHero.length > 0 ? indiceHero % filmesHero.length : 0;
     const filmeHero = filmesHero[indiceHeroSeguro] || null;
-    const outrosFilmes = filmes.slice(5);
+    const renderizarCardFilme = (item, prefixo) => {
+        const filme = item.filme || item;
+        const filmeId = filme.id || filme.id_filme;
+        const media = Number(item.media || 0);
+        const total = Number(item.total || 0);
+
+        return (
+            <div key={`${prefixo}-${filmeId}`} className="card-filme">
+                <img src={filme.poster || filme.imagem} alt={filme.titulo} className="poster-filme" />
+                <div className="card-info">
+                    <h3 className="card-titulo">{filme.titulo}</h3>
+                    <span className="card-ano">{filme.ano}</span>
+                    <div className="card-avaliacao">
+                        <Star size={14} fill="currentColor" />
+                        <span>{media.toFixed(1)}</span>
+                        <small>{total} {total === 1 ? "voto" : "votos"}</small>
+                    </div>
+                    <div className="card-tags">
+                        {renderizarCategorias(filme.categorias)}
+                    </div>
+                    <button
+                        className="btn-ver-detalhes-card"
+                        onClick={() => handleVerDetalhes(filmeId)}
+                    >
+                        Ver detalhes
+                    </button>
+                </div>
+            </div>
+        );
+    };
 
     if (carregando) {
         return <div className="carregando">Carregando filmes...</div>;
@@ -182,26 +225,24 @@ export default function Home() {
 
             <div className="listas-container">
                 <section className="trilho-filmes">
-                    <h2>Em Destaque</h2>
+                    <h2>Melhores Classificados</h2>
                     <div className="grid-filmes">
-                        {outrosFilmes.map((filme) => (
-                            <div key={`destaque-${filme.id || filme.id_filme}`} className="card-filme">
-                                <img src={filme.poster || filme.imagem} alt={filme.titulo} className="poster-filme" />
-                                <div className="card-info">
-                                    <h3 className="card-titulo">{filme.titulo}</h3>
-                                    <span className="card-ano">{filme.ano}</span>
-                                    <div className="card-tags">
-                                        {renderizarCategorias(filme.categorias)}
-                                    </div>
-                                    <button
-                                        className="btn-ver-detalhes-card"
-                                        onClick={() => handleVerDetalhes(filme.id || filme.id_filme)}
-                                    >
-                                        Ver detalhes
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                        {melhoresClassificados.length > 0 ? (
+                            melhoresClassificados.map((item) => renderizarCardFilme(item, "melhor"))
+                        ) : (
+                            <p className="sem-filmes-home">Nenhum filme classificado ainda.</p>
+                        )}
+                    </div>
+                </section>
+
+                <section className="trilho-filmes">
+                    <h2>Novidade</h2>
+                    <div className="grid-filmes">
+                        {novidades.length > 0 ? (
+                            novidades.map((item) => renderizarCardFilme(item, "novidade"))
+                        ) : (
+                            <p className="sem-filmes-home">Nenhuma novidade disponivel.</p>
+                        )}
                     </div>
                 </section>
             </div>

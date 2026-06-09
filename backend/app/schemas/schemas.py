@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -129,6 +129,47 @@ class FilmeListOut(BaseModel):
     categorias: List[CategoriaOut] = []
     diretores: List[DiretorOut] = []
 
+
+class FilmeComAvaliacaoOut(BaseModel):
+    filme: FilmeListOut
+    media: float = 0
+    total: int = 0
+
+
+class SolicitacaoAdicaoFilmeOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id_solicitacao: int
+    id_filme: int
+    id_usuario: int
+    status: str
+    data_criacao: Optional[datetime]
+    data_decisao: Optional[datetime]
+    filme: FilmeListOut
+
+
+class UsuarioSolicitanteOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id_usuario: int
+    nome: str
+    apelido: Optional[str]
+
+
+class SolicitacaoEdicaoFilmeCreate(BaseModel):
+    dados: FilmeUpdate
+
+
+class SolicitacaoEdicaoFilmeOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id_solicitacao: int
+    id_filme: int
+    id_usuario: int
+    dados: dict[str, Any]
+    status: str
+    data_criacao: Optional[datetime]
+    data_decisao: Optional[datetime]
+    filme: FilmeListOut
+    usuario: UsuarioSolicitanteOut
+
 # ─── Usuário ──────────────────────────────────────────────────────────────────
 
 class UsuarioCreate(BaseModel):
@@ -223,3 +264,24 @@ class DestaqueHomeSet(BaseModel):
 
 class MsgOut(BaseModel):
     detail: str
+
+
+class FavoritoStatusOut(BaseModel):
+    favoritado: bool
+
+
+class AvaliacaoFilmeIn(BaseModel):
+    nota: int
+
+    @field_validator("nota")
+    @classmethod
+    def nota_valida(cls, v: int) -> int:
+        if v < 0 or v > 5:
+            raise ValueError("Nota deve estar entre 0 e 5")
+        return v
+
+
+class AvaliacaoFilmeOut(BaseModel):
+    nota_usuario: Optional[int] = None
+    media: float = 0
+    total: int = 0

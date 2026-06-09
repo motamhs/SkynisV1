@@ -173,8 +173,8 @@
 
 .grid-filmes {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 24px;
 }
 
 .card-filme {
@@ -198,14 +198,14 @@
 }
 
 .card-info {
-  padding: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   flex: 1;
 }
 
 .card-titulo {
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 600;
   margin-bottom: 4px;
   white-space: nowrap;
@@ -216,7 +216,23 @@
 .card-ano {
   font-size: 0.8rem;
   color: #888888;
+  margin-bottom: 8px;
+}
+
+.card-avaliacao {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #facc15;
+  font-size: 0.86rem;
+  font-weight: 700;
   margin-bottom: 12px;
+}
+
+.card-avaliacao small {
+  color: #888888;
+  font-size: 0.74rem;
+  font-weight: 500;
 }
 
 .card-tags {
@@ -242,8 +258,8 @@
   border: 1px solid #3d1512;
   background-color: #1f0e0d;
   border-radius: 6px;
-  padding: 8px;
-  font-size: 0.85rem;
+  padding: 10px;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -251,4 +267,10 @@
 
 .btn-ver-detalhes-card:hover {
   background-color: #2a1210;
+}
+
+.sem-filmes-home {
+  color: #888888;
+  grid-column: 1 / -1;
+  margin: 0;
 }

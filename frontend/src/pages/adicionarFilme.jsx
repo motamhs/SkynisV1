@@ -67,11 +67,6 @@ export default function AdicionarFilme() {
       return;
     }
 
-    if (!usuarioEhAdmin()) {
-      navigate("/");
-      return;
-    }
-
     const buscarAuxiliares = async () => {
       try {
         const [
@@ -181,13 +176,16 @@ export default function AdicionarFilme() {
       }
 
       const filmeCriado = await resposta.json();
+      const admin = usuarioEhAdmin();
       setPopup({
         aberto: true,
         tipo: "sucesso",
-        titulo: "Filme salvo com sucesso",
-        mensagem: `"${filmeCriado.titulo}" foi adicionado ao catalogo.`,
-        textoConfirmar: "Ver filme",
-        onFechar: () => navigate(`/filme/${filmeCriado.id_filme}`),
+        titulo: admin ? "Filme salvo com sucesso" : "Filme enviado para aprovacao",
+        mensagem: admin
+          ? `"${filmeCriado.titulo}" foi adicionado ao catalogo.`
+          : `"${filmeCriado.titulo}" foi enviado para um administrador aprovar.`,
+        textoConfirmar: admin ? "Ver filme" : "Fechar",
+        onFechar: () => admin ? navigate(`/filme/${filmeCriado.id_filme}`) : navigate("/filmes"),
       });
     } catch (erro) {
       console.error("Erro ao salvar filme:", erro);
@@ -281,7 +279,7 @@ export default function AdicionarFilme() {
 
         <div className="cabecalho-adicionar">
           <h1>Adicionar Filme</h1>
-          <p>Publique diretamente no catalogo</p>
+          <p>{usuarioEhAdmin() ? "Publique diretamente no catalogo" : "Envie para aprovacao de um administrador"}</p>
         </div>
 
         <form className="form-adicionar-filme" onSubmit={salvarFilme}>
@@ -334,7 +332,7 @@ export default function AdicionarFilme() {
 
           <button type="submit" className="btn-salvar-filme" disabled={salvando}>
             <Save size={18} />
-            {salvando ? "Salvando..." : "Salvar Filme"}
+            {salvando ? "Salvando..." : usuarioEhAdmin() ? "Salvar Filme" : "Enviar para aprovacao"}
           </button>
         </form>
       </div>

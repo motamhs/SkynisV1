@@ -1,6 +1,6 @@
 from sqlalchemy import (
-    Boolean, Column, Date, DateTime, Enum, ForeignKey,
-    Integer, Numeric, String, Text, Time, func, create_engine
+    Boolean, CheckConstraint, Column, Date, DateTime, Enum, ForeignKey,
+    Integer, JSON, Numeric, String, Text, Time, UniqueConstraint, func, create_engine
 )
 from sqlalchemy.orm import relationship, sessionmaker
 
@@ -162,6 +162,68 @@ class Usuario(Base):
 
 
 # ─── Destaques da Home ────────────────────────────────────────────────────────
+
+class Favorito(Base):
+    __tablename__ = "favorito"
+    __table_args__ = (
+        UniqueConstraint("id_usuario", "id_filme", name="uq_favorito_usuario_filme"),
+    )
+
+    id_favorito = Column(Integer, primary_key=True, autoincrement=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_filme = Column(Integer, ForeignKey("filme.id_filme"), nullable=False)
+    data_criacao = Column(DateTime, default=func.now())
+
+    usuario = relationship("Usuario")
+    filme = relationship("Filme")
+
+
+class AvaliacaoFilme(Base):
+    __tablename__ = "avaliacao_filme"
+    __table_args__ = (
+        UniqueConstraint("id_usuario", "id_filme", name="uq_avaliacao_usuario_filme"),
+        CheckConstraint("nota >= 0 AND nota <= 5", name="ck_avaliacao_filme_nota"),
+    )
+
+    id_avaliacao = Column(Integer, primary_key=True, autoincrement=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_filme = Column(Integer, ForeignKey("filme.id_filme"), nullable=False)
+    nota = Column(Integer, nullable=False)
+    data_criacao = Column(DateTime, default=func.now())
+    data_atualizacao = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    usuario = relationship("Usuario")
+    filme = relationship("Filme")
+
+
+class SolicitacaoAdicaoFilme(Base):
+    __tablename__ = "solicitacao_adicao_filme"
+
+    id_solicitacao = Column(Integer, primary_key=True, autoincrement=True)
+    id_filme = Column(Integer, ForeignKey("filme.id_filme"), nullable=False, unique=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    status = Column(Enum("pendente", "aprovada", "rejeitada"), nullable=False, default="pendente")
+    data_criacao = Column(DateTime, default=func.now())
+    data_decisao = Column(DateTime)
+
+    filme = relationship("Filme")
+    usuario = relationship("Usuario")
+
+
+class SolicitacaoEdicaoFilme(Base):
+    __tablename__ = "solicitacao_edicao_filme"
+
+    id_solicitacao = Column(Integer, primary_key=True, autoincrement=True)
+    id_filme = Column(Integer, ForeignKey("filme.id_filme"), nullable=False)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    dados = Column(JSON, nullable=False)
+    status = Column(Enum("pendente", "aprovada", "rejeitada"), nullable=False, default="pendente")
+    data_criacao = Column(DateTime, default=func.now())
+    data_decisao = Column(DateTime)
+
+    filme = relationship("Filme")
+    usuario = relationship("Usuario")
+
 
 class DestaqueHome(Base):
     __tablename__ = "destaque_home"
