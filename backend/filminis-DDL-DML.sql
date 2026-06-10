@@ -158,6 +158,59 @@ CREATE TABLE usuario (
 
 -- ── Blacklist de refresh tokens
 
+CREATE TABLE favorito (
+    id_favorito  INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario   INT NOT NULL,
+    id_filme     INT NOT NULL,
+    data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_favorito_usuario_filme UNIQUE (id_usuario, id_filme),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_filme)   REFERENCES filme(id_filme)
+);
+
+CREATE TABLE avaliacao_filme (
+    id_avaliacao     INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario       INT NOT NULL,
+    id_filme         INT NOT NULL,
+    nota             INT NOT NULL,
+    data_criacao     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT ck_avaliacao_filme_nota CHECK (nota >= 0 AND nota <= 5),
+    CONSTRAINT uq_avaliacao_usuario_filme UNIQUE (id_usuario, id_filme),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_filme)   REFERENCES filme(id_filme)
+);
+
+CREATE TABLE solicitacao_adicao_filme (
+    id_solicitacao INT AUTO_INCREMENT PRIMARY KEY,
+    id_filme       INT NOT NULL UNIQUE,
+    id_usuario     INT NOT NULL,
+    status         ENUM('pendente','aprovada','rejeitada') NOT NULL DEFAULT 'pendente',
+    data_criacao   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    data_decisao   DATETIME,
+    FOREIGN KEY (id_filme)   REFERENCES filme(id_filme),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+);
+
+CREATE TABLE solicitacao_edicao_filme (
+    id_solicitacao INT AUTO_INCREMENT PRIMARY KEY,
+    id_filme       INT NOT NULL,
+    id_usuario     INT NOT NULL,
+    dados          JSON NOT NULL,
+    status         ENUM('pendente','aprovada','rejeitada') NOT NULL DEFAULT 'pendente',
+    data_criacao   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    data_decisao   DATETIME,
+    FOREIGN KEY (id_filme)   REFERENCES filme(id_filme),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+);
+
+CREATE TABLE destaque_home (
+    id        INT AUTO_INCREMENT PRIMARY KEY,
+    id_filme  INT NOT NULL UNIQUE,
+    ordem     INT NOT NULL DEFAULT 0,
+    FOREIGN KEY (id_filme) REFERENCES filme(id_filme)
+);
+
 CREATE TABLE refresh_token_blacklist (
     id         INT AUTO_INCREMENT PRIMARY KEY,
     token      VARCHAR(512) NOT NULL UNIQUE,
@@ -448,5 +501,72 @@ INSERT INTO diretor_pais (id_diretor, id_pais) VALUES
 INSERT INTO produtora_pais (id_produtora, id_pais) VALUES
 (1,1),(2,3),(3,1),(4,1),(5,1),(6,1),(7,1),(8,1),(9,1),(10,1),
 (11,1),(12,1),(13,1),(14,1),(15,1);
+
+-- Usuarios de exemplo
+-- Senhas: admin@skynis.com/admin123, ana@skynis.com/user123,
+-- maria@skynis.com/maria123, joao@skynis.com/joao123
+
+INSERT INTO usuario (id_usuario, nome, sobrenome, apelido, email, senha, data_nascimento, imagem, role) VALUES
+(1,'Admin','Skynis','admin','admin@skynis.com','$2b$12$1uHPddJ6RPGFp5NYHu3Nge6nFXDp.hmF6yzSrTHeF4Ds3JrNj8Fly','1995-01-15','https://ui-avatars.com/api/?name=Admin+Skynis&background=e03c2f&color=ffffff&size=512','admin'),
+(2,'Ana','Silva','ana','ana@skynis.com','$2b$12$kbit6VQ1FoRQtu0nGcO5jup7oj3cfytaE.ov6tI2eEJYdsFoJcOIW','2000-04-22','https://ui-avatars.com/api/?name=Ana+Silva&background=1a1a1a&color=ffffff&size=512','user'),
+(3,'Maria','Oliveira','maria','maria@skynis.com','$2b$12$qYAMixKhezDJG5CxWsIel.ZIUJ0HzBZtM./qmbt1GLsiy9FFMbJEC','1998-09-03','https://ui-avatars.com/api/?name=Maria+Oliveira&background=1a1a1a&color=ffffff&size=512','user'),
+(4,'Joao','Santos','joao','joao@skynis.com','$2b$12$V/9sH69aph2y07PozElzA.3CSnEi9hPGbMocQDFVmhr5j0.i1rVv2','1997-12-11','https://ui-avatars.com/api/?name=Joao+Santos&background=1a1a1a&color=ffffff&size=512','user');
+
+-- Historico de adicoes aprovadas para os filmes iniciais
+
+INSERT INTO solicitacao_adicao_filme (id_filme, id_usuario, status, data_decisao) VALUES
+(1,1,'aprovada',CURRENT_TIMESTAMP),(2,1,'aprovada',CURRENT_TIMESTAMP),
+(3,1,'aprovada',CURRENT_TIMESTAMP),(4,1,'aprovada',CURRENT_TIMESTAMP),
+(5,1,'aprovada',CURRENT_TIMESTAMP),(6,1,'aprovada',CURRENT_TIMESTAMP),
+(7,1,'aprovada',CURRENT_TIMESTAMP),(8,1,'aprovada',CURRENT_TIMESTAMP),
+(9,1,'aprovada',CURRENT_TIMESTAMP),(10,1,'aprovada',CURRENT_TIMESTAMP),
+(11,1,'aprovada',CURRENT_TIMESTAMP),(12,1,'aprovada',CURRENT_TIMESTAMP),
+(13,1,'aprovada',CURRENT_TIMESTAMP),(14,1,'aprovada',CURRENT_TIMESTAMP),
+(15,1,'aprovada',CURRENT_TIMESTAMP),(16,1,'aprovada',CURRENT_TIMESTAMP),
+(17,1,'aprovada',CURRENT_TIMESTAMP),(18,1,'aprovada',CURRENT_TIMESTAMP),
+(19,1,'aprovada',CURRENT_TIMESTAMP),(20,1,'aprovada',CURRENT_TIMESTAMP);
+
+-- Solicitacoes de edicao de exemplo
+
+INSERT INTO solicitacao_edicao_filme (id_filme, id_usuario, dados, status, data_decisao) VALUES
+(5,2,JSON_OBJECT('sinopse','Bruce Wayne investiga a corrupcao de Gotham enquanto enfrenta o Charada.'),'pendente',NULL),
+(12,3,JSON_OBJECT('trailer','https://www.youtube.com/watch?v=zSWdZVtXT7E'),'aprovada',CURRENT_TIMESTAMP),
+(16,4,JSON_OBJECT('ano',2023),'rejeitada',CURRENT_TIMESTAMP);
+
+-- Favoritos de exemplo
+
+INSERT INTO favorito (id_usuario, id_filme) VALUES
+(2,5),(2,12),(2,16),(2,20),
+(3,2),(3,11),(3,14),(3,18),
+(4,1),(4,7),(4,13),(4,19);
+
+-- Avaliacoes de exemplo, usadas nos cards, detalhes e rankings
+
+INSERT INTO avaliacao_filme (id_usuario, id_filme, nota) VALUES
+(2,1,4),(3,1,3),(4,1,4),
+(2,2,5),(3,2,5),(4,2,4),
+(2,3,4),(3,3,5),(4,3,4),
+(2,4,3),(3,4,3),(4,4,4),
+(2,5,5),(3,5,4),(4,5,5),
+(2,6,4),(3,6,4),(4,6,5),
+(2,7,5),(3,7,5),(4,7,4),
+(2,8,4),(3,8,5),(4,8,5),
+(2,9,3),(3,9,4),(4,9,3),
+(2,10,4),(3,10,4),(4,10,5),
+(2,11,5),(3,11,5),(4,11,5),
+(2,12,5),(3,12,5),(4,12,4),
+(2,13,5),(3,13,4),(4,13,5),
+(2,14,5),(3,14,5),(4,14,5),
+(2,15,4),(3,15,4),(4,15,5),
+(2,16,4),(3,16,5),(4,16,4),
+(2,17,4),(3,17,4),(4,17,4),
+(2,18,5),(3,18,4),(4,18,5),
+(2,19,5),(3,19,5),(4,19,4),
+(2,20,4),(3,20,5),(4,20,4);
+
+-- Destaques da home
+
+INSERT INTO destaque_home (id_filme, ordem) VALUES
+(12,1),(11,2),(5,3),(14,4),(18,5),(20,6);
 
 

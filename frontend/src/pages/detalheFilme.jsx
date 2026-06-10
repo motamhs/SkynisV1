@@ -1,112 +1,33 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Heart, Pencil, Save, Send, Star, User, X } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import {
+  AvaliacaoFilme,
+  CabecalhoFilme,
+  ElencoFilme,
+  MetadadosFilme,
+  TrailerFilme,
+} from "../components/BlocosDetalheFilme";
+import ModalEdicaoFilme from "../components/ModalEdicaoFilme";
 import Popup from "../components/popup";
+import {
+  API_URL,
+  AUXILIARES_VAZIOS,
+  CAMPOS_EDICAO,
+  CAMPOS_LISTA_EDICAO,
+  CONFIG_CRIACAO_AUXILIAR,
+  criarFormularioFilme,
+  formatarValorPopup,
+  idDoItem,
+  montarPayloadAuxiliar,
+  nomeItem,
+  normalizarLista,
+  obterUrlTrailerEmbed,
+  usuarioEhAdmin,
+} from "../utils/movieForm";
 import "./css/detalheFilme.css";
 
-const API_URL = "http://localhost:8000";
 const POSTER_PADRAO = "https://placehold.co/500x750/111111/e03c2f?text=Sem+Poster";
-const AUXILIARES_VAZIOS = {
-  atores: [],
-  categorias: [],
-  diretores: [],
-  linguagens: [],
-  paises: [],
-  produtoras: [],
-};
-
-const usuarioEhAdmin = () => {
-  const token = localStorage.getItem("access_token");
-  if (!token) return false;
-
-  try {
-    const payloadBase64 = token.split(".")[1];
-    const payloadJson = JSON.parse(
-      atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/"))
-    );
-
-    return payloadJson.role === "admin";
-  } catch {
-    return false;
-  }
-};
-
-const idDoItem = (item, campo) => item?.id ?? item?.[campo];
-
-const idsDaLista = (lista, campo) =>
-  (Array.isArray(lista) ? lista : [])
-    .map((item) => idDoItem(item, campo))
-    .filter((itemId) => itemId !== undefined && itemId !== null)
-    .map(String);
-
-const criarFormulario = (filme) => ({
-  titulo: filme?.titulo || "",
-  ano: filme?.ano ? String(filme.ano) : "",
-  duracao: filme?.duracao || "",
-  orcamento: filme?.orcamento ? String(filme.orcamento) : "",
-  sinopse: filme?.sinopse || "",
-  poster: filme?.poster || "",
-  banner: filme?.banner || "",
-  trailer: filme?.trailer || "",
-  ids_atores: idsDaLista(filme?.atores, "id_ator"),
-  ids_categorias: idsDaLista(filme?.categorias, "id_categoria"),
-  ids_diretores: idsDaLista(filme?.diretores, "id_diretor"),
-  ids_linguagens: idsDaLista(filme?.linguagens, "id_linguagem"),
-  ids_paises: idsDaLista(filme?.paises, "id_pais"),
-  ids_produtoras: idsDaLista(filme?.produtoras, "id_produtora"),
-});
-
-const obterUrlTrailerEmbed = (url) => {
-  if (!url) return "";
-
-  try {
-    const trailerUrl = new URL(url);
-
-    if (trailerUrl.pathname.startsWith("/embed/")) {
-      return url;
-    }
-
-    if (trailerUrl.hostname.includes("youtu.be")) {
-      const videoId = trailerUrl.pathname.replace("/", "");
-      return videoId ? `https://www.youtube.com/embed/${videoId}` : "";
-    }
-
-    if (trailerUrl.hostname.includes("youtube.com")) {
-      const videoId = trailerUrl.searchParams.get("v");
-      return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
-    }
-
-    return url;
-  } catch {
-    return url;
-  }
-};
-
-const CAMPOS_EDICAO = [
-  ["titulo", "Titulo"],
-  ["ano", "Ano"],
-  ["duracao", "Duracao"],
-  ["orcamento", "Orcamento"],
-  ["sinopse", "Sinopse"],
-  ["poster", "Poster"],
-  ["banner", "Banner"],
-  ["trailer", "Trailer"],
-];
-
-const CAMPOS_LISTA_EDICAO = [
-  ["ids_categorias", "Categorias", "categorias", "id_categoria"],
-  ["ids_diretores", "Diretores", "diretores", "id_diretor"],
-  ["ids_atores", "Atores", "atores", "id_ator"],
-  ["ids_produtoras", "Produtoras", "produtoras", "id_produtora"],
-  ["ids_paises", "Paises", "paises", "id_pais"],
-  ["ids_linguagens", "Idiomas", "linguagens", "id_linguagem"],
-];
-
-const formatarValorPopup = (valor) => {
-  if (valor === undefined || valor === null || valor === "") return "Vazio";
-  const texto = String(valor);
-  return texto.length > 120 ? `${texto.slice(0, 117)}...` : texto;
-};
 
 export default function FilmeDetalhes() {
   const { id } = useParams();
@@ -120,9 +41,12 @@ export default function FilmeDetalhes() {
   const [favoritando, setFavoritando] = useState(false);
   const [avaliacao, setAvaliacao] = useState({ nota_usuario: null, media: 0, total: 0 });
   const [salvandoAvaliacao, setSalvandoAvaliacao] = useState(false);
-  const [form, setForm] = useState(criarFormulario(null));
+  const [form, setForm] = useState(criarFormularioFilme(null));
   const [auxiliares, setAuxiliares] = useState(AUXILIARES_VAZIOS);
   const [buscas, setBuscas] = useState({});
+  const [novosAuxiliares, setNovosAuxiliares] = useState({});
+  const [criacaoAberta, setCriacaoAberta] = useState({});
+  const [criandoAuxiliar, setCriandoAuxiliar] = useState({});
   const [popup, setPopup] = useState({ aberto: false });
   const admin = usuarioEhAdmin();
 
@@ -146,7 +70,7 @@ export default function FilmeDetalhes() {
 
         const dados = await resposta.json();
         setFilme(dados);
-        setForm(criarFormulario(dados));
+        setForm(criarFormularioFilme(dados));
 
         const token = localStorage.getItem("access_token");
         const filmeId = dados.id || dados.id_filme;
@@ -232,8 +156,10 @@ export default function FilmeDetalhes() {
     const overflowOriginal = document.body.style.overflow;
     const fecharComEscape = (event) => {
       if (event.key === "Escape" && !salvando) {
-        setForm(criarFormulario(filme));
+        setForm(criarFormularioFilme(filme));
         setBuscas({});
+        setCriacaoAberta({});
+        setNovosAuxiliares({});
         setEditando(false);
       }
     };
@@ -246,61 +172,6 @@ export default function FilmeDetalhes() {
       document.removeEventListener("keydown", fecharComEscape);
     };
   }, [editando, salvando, filme]);
-
-  const normalizarLista = (valor) => {
-    if (!valor) return [];
-    if (Array.isArray(valor)) return valor;
-
-    if (typeof valor === "string") {
-      try {
-        const parsed = JSON.parse(valor);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return valor
-          .split(",")
-          .map((nome) => ({ nome: nome.trim() }))
-          .filter((item) => item.nome);
-      }
-    }
-
-    return [];
-  };
-
-  const nomeItem = (item) => {
-    if (!item) return "";
-    if (typeof item === "string") return item;
-
-    const partes = [item.nome, item.sobrenome].filter(Boolean);
-    return partes.join(" ");
-  };
-
-  const formatarLista = (valor) => {
-    const nomes = normalizarLista(valor).map(nomeItem).filter(Boolean);
-    return nomes.length > 0 ? nomes.join(", ") : "Nao informado";
-  };
-
-  const formatarDuracao = (valor) => {
-    if (!valor) return "Nao informada";
-    if (typeof valor !== "string") return String(valor);
-
-    const [horas, minutos] = valor.split(":").map(Number);
-    if (Number.isNaN(horas) || Number.isNaN(minutos)) return valor;
-
-    if (horas > 0) return `${horas}h ${String(minutos).padStart(2, "0")}min`;
-    return `${minutos}min`;
-  };
-
-  const formatarOrcamento = (valor) => {
-    if (!valor) return "Nao informado";
-
-    const numero = Number(valor);
-    if (Number.isNaN(numero)) return "Nao informado";
-
-    return numero.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "USD",
-    });
-  };
 
   const atualizarCampo = (campo, valor) => {
     setForm((atual) => ({ ...atual, [campo]: valor }));
@@ -332,9 +203,95 @@ export default function FilmeDetalhes() {
     setBuscas((atual) => ({ ...atual, [campo]: valor }));
   };
 
+  const atualizarNovoAuxiliar = (campo, subcampo, valor) => {
+    setNovosAuxiliares((atual) => ({
+      ...atual,
+      [campo]: {
+        nome: "",
+        sobrenome: "",
+        foto: "",
+        ...(atual[campo] || {}),
+        [subcampo]: valor,
+      },
+    }));
+  };
+
+  const alternarCriacaoAuxiliar = (campo) => {
+    setCriacaoAberta((atual) => ({ ...atual, [campo]: !atual[campo] }));
+  };
+
+  const criarItemAuxiliar = async (campo) => {
+    const config = CONFIG_CRIACAO_AUXILIAR[campo];
+    const dadosCriacao = {
+      nome: "",
+      sobrenome: "",
+      foto: "",
+      ...(novosAuxiliares[campo] || {}),
+    };
+    const nomeInformado = dadosCriacao.nome.trim();
+    const token = localStorage.getItem("access_token");
+
+    if (!config || !nomeInformado || !token) return;
+
+    try {
+      setCriandoAuxiliar((atual) => ({ ...atual, [campo]: true }));
+
+      const resposta = await fetch(`${API_URL}/dados/${config.endpoint}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(montarPayloadAuxiliar({ ...dadosCriacao, nome: nomeInformado }, config.tipo)),
+      });
+
+      if (!resposta.ok) {
+        const erroResposta = await resposta.json().catch(() => null);
+        throw new Error(erroResposta?.detail || "Erro ao criar item.");
+      }
+
+      const novoItem = await resposta.json();
+      const novoId = idDoItem(novoItem, config.campoId);
+
+      setAuxiliares((atual) => {
+        const listaAtual = atual[config.chave] || [];
+        const jaExiste = listaAtual.some((item) => String(idDoItem(item, config.campoId)) === String(novoId));
+
+        return {
+          ...atual,
+          [config.chave]: jaExiste ? listaAtual : [...listaAtual, novoItem],
+        };
+      });
+
+      setForm((atual) => ({
+        ...atual,
+        [campo]: atual[campo].includes(String(novoId)) ? atual[campo] : [...atual[campo], String(novoId)],
+      }));
+      setBuscas((atual) => ({ ...atual, [campo]: "" }));
+      setCriacaoAberta((atual) => ({ ...atual, [campo]: false }));
+      setNovosAuxiliares((atual) => ({
+        ...atual,
+        [campo]: { nome: "", sobrenome: "", foto: "" },
+      }));
+    } catch (erroCriacao) {
+      setPopup({
+        aberto: true,
+        tipo: "erro",
+        titulo: "Erro ao criar item",
+        mensagem: erroCriacao.message || "Nao foi possivel criar este item.",
+        textoConfirmar: "Fechar",
+        onFechar: () => setPopup({ aberto: false }),
+      });
+    } finally {
+      setCriandoAuxiliar((atual) => ({ ...atual, [campo]: false }));
+    }
+  };
+
   const abrirEdicao = () => {
-    setForm(criarFormulario(filme));
+    setForm(criarFormularioFilme(filme));
     setBuscas({});
+    setCriacaoAberta({});
+    setNovosAuxiliares({});
     setEditando(true);
   };
 
@@ -349,8 +306,10 @@ export default function FilmeDetalhes() {
   };
 
   const cancelarEdicao = () => {
-    setForm(criarFormulario(filme));
+    setForm(criarFormularioFilme(filme));
     setBuscas({});
+    setCriacaoAberta({});
+    setNovosAuxiliares({});
     setEditando(false);
   };
 
@@ -382,7 +341,7 @@ export default function FilmeDetalhes() {
   };
 
   const obterAlteracoesEdicao = () => {
-    const original = criarFormulario(filme);
+    const original = criarFormularioFilme(filme);
     const alteracoes = [];
 
     CAMPOS_EDICAO.forEach(([campo, label]) => {
@@ -474,9 +433,9 @@ export default function FilmeDetalhes() {
       const dadosResposta = await resposta.json();
       if (admin) {
         setFilme(dadosResposta);
-        setForm(criarFormulario(dadosResposta));
+        setForm(criarFormularioFilme(dadosResposta));
       } else {
-        setForm(criarFormulario(filme));
+        setForm(criarFormularioFilme(filme));
       }
       setEditando(false);
       setPopup({
@@ -585,74 +544,6 @@ export default function FilmeDetalhes() {
     }
   };
 
-  const renderizarSeletorMultiplo = (label, campo, itens, campoId) => {
-    const termoBusca = buscas[campo] || "";
-    const selecionados = form[campo];
-    const itensSelecionados = itens.filter((item) =>
-      selecionados.includes(String(idDoItem(item, campoId)))
-    );
-    const itensFiltrados = itens.filter((item) =>
-      nomeItem(item).toLowerCase().includes(termoBusca.toLowerCase())
-    );
-
-    return (
-      <div className="grupo-edicao seletor-multiplo">
-        <span>{label}</span>
-
-        <input
-          value={termoBusca}
-          onChange={(event) => atualizarBusca(campo, event.target.value)}
-          placeholder={`Buscar ${label.toLowerCase()}`}
-        />
-
-        <div className="chips-selecionados">
-          {itensSelecionados.length > 0 ? (
-            itensSelecionados.map((item) => {
-              const itemId = idDoItem(item, campoId);
-              return (
-                <button
-                  key={itemId}
-                  type="button"
-                  className="chip-selecionado"
-                  onClick={() => removerItemLista(campo, itemId)}
-                >
-                  {nomeItem(item)}
-                  <X size={14} />
-                </button>
-              );
-            })
-          ) : (
-            <small>Nenhum selecionado</small>
-          )}
-        </div>
-
-        <div className="lista-opcoes-multipla">
-          {itensFiltrados.length > 0 ? (
-            itensFiltrados.map((item) => {
-              const itemId = idDoItem(item, campoId);
-              const itemIdTexto = String(itemId);
-              const selecionado = selecionados.includes(itemIdTexto);
-
-              return (
-                <button
-                  key={itemId}
-                  type="button"
-                  className={`opcao-multipla${selecionado ? " selecionada" : ""}`}
-                  onClick={() => alternarItemLista(campo, itemId)}
-                >
-                  <span className="checkbox-multiplo">{selecionado ? "✓" : ""}</span>
-                  <span>{nomeItem(item)}</span>
-                </button>
-              );
-            })
-          ) : (
-            <p className="sem-opcoes-multipla">Nenhum resultado.</p>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   if (carregando) {
     return <div className="carregando-detalhes">Carregando detalhes...</div>;
   }
@@ -686,163 +577,43 @@ export default function FilmeDetalhes() {
           </div>
 
           <div className="area-infos">
-            <h1 className="detalhes-titulo">{filme.titulo}</h1>
+            <CabecalhoFilme
+              filme={filme}
+              categorias={categorias}
+              admin={admin}
+              favoritado={favoritado}
+              favoritando={favoritando}
+              onFavoritar={alternarFavorito}
+              onEditar={abrirEdicao}
+              onSolicitarEdicao={abrirSolicitacaoEdicao}
+            />
 
-            <div className="detalhes-header-infos">
-              <span className="detalhes-ano">{filme.ano || "Ano nao informado"}</span>
-              <div className="detalhes-tags">
-                {categorias.length > 0 ? (
-                  categorias.map((categoria, index) => (
-                    <span key={categoria.id_categoria || categoria.id || index} className="tag">
-                      {nomeItem(categoria)}
-                    </span>
-                  ))
-                ) : (
-                  <span className="tag">Sem genero</span>
-                )}
-              </div>
-            </div>
-
-            <p className="detalhes-sinopse">
-              {filme.sinopse || "Sinopse nao disponivel para este filme."}
-            </p>
-
-            <div className="detalhes-botoes-acao">
-              <button className={`btn-favoritado${favoritado ? " ativo" : ""}`} onClick={alternarFavorito} disabled={favoritando}>
-                <Heart size={18} fill={favoritado ? "currentColor" : "none"} />
-                {favoritando ? "Salvando..." : favoritado ? "Favoritado" : "Favoritar"}
-              </button>
-              {admin ? (
-                <button className="btn-solicitar-edicao" onClick={abrirEdicao}>
-                  <Pencil size={18} />
-                  Editar Filme
-                </button>
-              ) : (
-                <button className="btn-solicitar-edicao" onClick={abrirSolicitacaoEdicao}>
-                  <Send size={18} />
-                  Solicitar Edicao
-                </button>
-              )}
-            </div>
-
-            <section className="secao-avaliacao">
-              <div className="avaliacao-resumo">
-                <span className="avaliacao-label">Avaliacao dos usuarios</span>
-                <strong>{Number(avaliacao.media || 0).toFixed(1)}</strong>
-                <span>{avaliacao.total} {avaliacao.total === 1 ? "voto" : "votos"}</span>
-              </div>
-
-              <div className="avaliacao-voto">
-                <span>Sua nota</span>
-                <button
-                  type="button"
-                  className={`btn-nota-zero${avaliacao.nota_usuario === 0 ? " ativo" : ""}`}
-                  onClick={() => salvarAvaliacao(0)}
-                  disabled={salvandoAvaliacao}
-                  title="Dar 0 estrelas"
-                >
-                  0
-                </button>
-                {[1, 2, 3, 4, 5].map((nota) => (
-                  <button
-                    key={nota}
-                    type="button"
-                    className={`btn-estrela${Number(avaliacao.nota_usuario) >= nota ? " ativa" : ""}`}
-                    onClick={() => salvarAvaliacao(nota)}
-                    disabled={salvandoAvaliacao}
-                    title={`${nota} ${nota === 1 ? "estrela" : "estrelas"}`}
-                  >
-                    <Star size={22} fill={Number(avaliacao.nota_usuario) >= nota ? "currentColor" : "none"} />
-                  </button>
-                ))}
-                <small>
-                  {avaliacao.nota_usuario === null || avaliacao.nota_usuario === undefined
-                    ? "Voce ainda nao avaliou"
-                    : `Voce avaliou com ${avaliacao.nota_usuario}`}
-                </small>
-              </div>
-            </section>
-
-
+            <AvaliacaoFilme
+              avaliacao={avaliacao}
+              salvando={salvandoAvaliacao}
+              onAvaliar={salvarAvaliacao}
+            />
 
             {editando && (
-              <div
-                className="modal-edicao-overlay"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="titulo-modal-edicao"
-                onMouseDown={() => {
-                  if (!salvando) cancelarEdicao();
-                }}
-              >
-                <form
-                  className="form-edicao-filme"
-                  onSubmit={solicitarConfirmacaoEdicao}
-                  onMouseDown={(event) => event.stopPropagation()}
-                >
-                  <div className="form-edicao-header">
-                    <h2 id="titulo-modal-edicao">{admin ? "Editar dados do filme" : "Solicitar edicao do filme"}</h2>
-                    <button type="button" className="btn-cancelar-edicao" onClick={cancelarEdicao}>
-                      <X size={18} />
-                      Cancelar
-                    </button>
-                  </div>
-
-                  <div className="grid-edicao">
-                    <label className="grupo-edicao">
-                      <span>Titulo</span>
-                      <input value={form.titulo} onChange={(event) => atualizarCampo("titulo", event.target.value)} required />
-                    </label>
-
-                    <label className="grupo-edicao">
-                      <span>Ano</span>
-                      <input type="number" value={form.ano} onChange={(event) => atualizarCampo("ano", event.target.value)} />
-                    </label>
-
-                    <label className="grupo-edicao">
-                      <span>Duracao</span>
-                      <input value={form.duracao} onChange={(event) => atualizarCampo("duracao", event.target.value)} placeholder="HH:MM:SS" />
-                    </label>
-
-                    <label className="grupo-edicao">
-                      <span>Orcamento</span>
-                      <input type="number" value={form.orcamento} onChange={(event) => atualizarCampo("orcamento", event.target.value)} />
-                    </label>
-
-                    <label className="grupo-edicao grupo-edicao-largo">
-                      <span>Sinopse</span>
-                      <textarea value={form.sinopse} onChange={(event) => atualizarCampo("sinopse", event.target.value)} rows={5} />
-                    </label>
-
-                    <label className="grupo-edicao grupo-edicao-largo">
-                      <span>Poster</span>
-                      <input value={form.poster} onChange={(event) => atualizarCampo("poster", event.target.value)} />
-                    </label>
-
-                    <label className="grupo-edicao grupo-edicao-largo">
-                      <span>Banner</span>
-                      <input value={form.banner} onChange={(event) => atualizarCampo("banner", event.target.value)} />
-                    </label>
-
-                    <label className="grupo-edicao grupo-edicao-largo">
-                      <span>Trailer</span>
-                      <input value={form.trailer} onChange={(event) => atualizarCampo("trailer", event.target.value)} />
-                    </label>
-
-                    {renderizarSeletorMultiplo("Categorias", "ids_categorias", auxiliares.categorias, "id_categoria")}
-                    {renderizarSeletorMultiplo("Diretores", "ids_diretores", auxiliares.diretores, "id_diretor")}
-                    {renderizarSeletorMultiplo("Atores", "ids_atores", auxiliares.atores, "id_ator")}
-                    {renderizarSeletorMultiplo("Produtoras", "ids_produtoras", auxiliares.produtoras, "id_produtora")}
-                    {renderizarSeletorMultiplo("Paises", "ids_paises", auxiliares.paises, "id_pais")}
-                    {renderizarSeletorMultiplo("Idiomas", "ids_linguagens", auxiliares.linguagens, "id_linguagem")}
-                  </div>
-
-                  <button type="submit" className="btn-salvar-edicao" disabled={salvando}>
-                    <Save size={18} />
-                    {salvando ? "Salvando..." : admin ? "Salvar alteracoes" : "Enviar solicitacao"}
-                  </button>
-                </form>
-              </div>
+              <ModalEdicaoFilme
+                admin={admin}
+                form={form}
+                auxiliares={auxiliares}
+                buscas={buscas}
+                novosAuxiliares={novosAuxiliares}
+                criacaoAberta={criacaoAberta}
+                criandoAuxiliar={criandoAuxiliar}
+                salvando={salvando}
+                onCancelar={cancelarEdicao}
+                onSubmit={solicitarConfirmacaoEdicao}
+                onCampo={atualizarCampo}
+                onBusca={atualizarBusca}
+                onToggleItem={alternarItemLista}
+                onRemoverItem={removerItemLista}
+                onToggleCriacao={alternarCriacaoAuxiliar}
+                onNovoChange={atualizarNovoAuxiliar}
+                onCriarAuxiliar={criarItemAuxiliar}
+              />
             )}
 
             <Popup
@@ -859,73 +630,9 @@ export default function FilmeDetalhes() {
               carregando={popup.carregando}
             />
 
-            <div className="grid-metadados">
-              <div className="card-meta">
-                <span className="meta-label">DIRETOR</span>
-                <span className="meta-valor">{formatarLista(filme.diretores)}</span>
-              </div>
-              <div className="card-meta">
-                <span className="meta-label">DURACAO</span>
-                <span className="meta-valor">{formatarDuracao(filme.duracao)}</span>
-              </div>
-              <div className="card-meta">
-                <span className="meta-label">PRODUTORA</span>
-                <span className="meta-valor">{formatarLista(filme.produtoras)}</span>
-              </div>
-              <div className="card-meta">
-                <span className="meta-label">ORCAMENTO</span>
-                <span className="meta-valor">{formatarOrcamento(filme.orcamento)}</span>
-              </div>
-              <div className="card-meta">
-                <span className="meta-label">PAIS</span>
-                <span className="meta-valor">{formatarLista(paises)}</span>
-              </div>
-              <div className="card-meta">
-                <span className="meta-label">IDIOMA</span>
-                <span className="meta-valor">{formatarLista(filme.linguagens)}</span>
-              </div>
-            </div>
-
-            {trailerEmbed && (
-              <section className="secao-trailer">
-                <h2>Trailer</h2>
-                <div className="trailer-container">
-                  <iframe
-                    src={trailerEmbed}
-                    title={`Trailer de ${filme.titulo}`}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    allowFullScreen
-                  />
-                </div>
-              </section>
-            )}
-
-            <div className="secao-elenco">
-              <h2>Elenco</h2>
-              <div className="lista-elenco">
-                {atores.length > 0 ? (
-                  atores.map((ator, index) => (
-                    <div key={ator.id_ator || ator.id || index} className="ator-card">
-                      <div className="ator-avatar">
-                        {ator.foto ? (
-                          <img src={ator.foto} alt={nomeItem(ator)} />
-                        ) : (
-                          <User size={32} color="#666" />
-                        )}
-                      </div>
-                      <span className="ator-nome">{nomeItem(ator)}</span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="elenco-vazio">Elenco nao informado.</p>
-                )}
-
-
-              </div>
-
-
-            </div>
+            <MetadadosFilme filme={filme} paises={paises} />
+            <TrailerFilme titulo={filme.titulo} trailerEmbed={trailerEmbed} />
+            <ElencoFilme atores={atores} />
           </div>
         </div>
       </div>

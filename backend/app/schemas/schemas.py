@@ -41,6 +41,33 @@ class ProdutoraOut(BaseModel):
 
 # ─── Ator / Diretor ───────────────────────────────────────────────────────────
 
+class NomeCreate(BaseModel):
+    nome: str
+
+    @field_validator("nome")
+    @classmethod
+    def nome_obrigatorio(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Nome e obrigatorio")
+        return v.strip()
+
+class PessoaCreate(BaseModel):
+    nome: str
+    sobrenome: str = ""
+    foto: Optional[str] = None
+
+    @field_validator("nome")
+    @classmethod
+    def nome_obrigatorio(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Nome e obrigatorio")
+        return v.strip()
+
+    @field_validator("sobrenome")
+    @classmethod
+    def sobrenome_limpo(cls, v: str) -> str:
+        return v.strip() if v else ""
+
 class AtorOut(BaseModel):
     model_config = {"from_attributes": True}
     id_ator: int
