@@ -8,7 +8,7 @@ const paginas = [
   { chave: "inicio", rotulo: "Inicio", icone: <Home />, roles: [null, "usuario", "admin"] },
   { chave: "filmes", rotulo: "Filmes", icone: <Film />, roles: [null, "usuario", "admin"] },
   { chave: "perfil", rotulo: "Perfil", icone: <User />, roles: ["usuario", "admin"] },
-  { chave: "admin", rotulo: "Admin", icone: <Shield />, roles: ["admin"] },
+  { chave: "admin", rotulo: "Gerenciamento", icone: <Shield />, roles: ["admin"] },
 ];
 
 export default function Navbar({ role = null, aoNavegar, aoSair }) {

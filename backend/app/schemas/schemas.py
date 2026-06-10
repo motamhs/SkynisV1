@@ -194,7 +194,7 @@ class SolicitacaoEdicaoFilmeOut(BaseModel):
     status: str
     data_criacao: Optional[datetime]
     data_decisao: Optional[datetime]
-    filme: FilmeListOut
+    filme: FilmeOut
     usuario: UsuarioSolicitanteOut
 
 # ─── Usuário ──────────────────────────────────────────────────────────────────

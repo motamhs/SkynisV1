@@ -125,6 +125,11 @@
   font-weight: 600;
 }
 
+.seta-comparacao {
+  color: #777777;
+  margin: 0 4px;
+}
+
 
 .admin-item-acoes {
   display: flex;

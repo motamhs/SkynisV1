@@ -178,9 +178,15 @@ export default function Perfil() {
 
     buscarDadosUsuario();
     buscarFavoritos();
-    buscarSolicitacoes();
-    buscarAdicoes();
-  }, [navigate]);
+
+    if (!admin) {
+      buscarSolicitacoes();
+      buscarAdicoes();
+    } else {
+      setCarregandoSolicitacoes(false);
+      setCarregandoAdicoes(false);
+    }
+  }, [navigate, admin]);
 
   const fecharPopup = () => setPopup({ aberto: false });
 
@@ -469,6 +475,7 @@ export default function Perfil() {
         )}
 
 
+        {!admin && (
         <section className="secao-perfil">
           <h3>Solicitacoes de Edicao ({solicitacoesEdicao.length})</h3>
           <div className="lista-solicitacoes">
@@ -495,6 +502,7 @@ export default function Perfil() {
             )}
           </div>
         </section>
+        )}
 
       </div>
 
