@@ -74,9 +74,9 @@ Copie o arquivo de exemplo e edite com seus dados:
 cp .venv.example .venv
 ```
 
-Edite o `.venv`:
+Edite o `app/core/config.py`:
 
-```venv
+```
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
