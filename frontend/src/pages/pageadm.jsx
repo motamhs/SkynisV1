@@ -1,126 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Clock, Film, Pencil, Trash2, X } from "lucide-react";
 import Popup from "../components/popup";
-import { AUXILIARES_VAZIOS, idDoItem, nomeItem } from "../utils/movieForm";
+import { ResumoGerenciamento, SecaoEdicoes, SecaoFilmes } from "../components/Gerenciamento";
+import { pegarIdFilme, obterResumoEdicao } from "../utils/edicoesGerenciamento";
+import { AUXILIARES_VAZIOS } from "../utils/movieForm";
 import "./css/pageadm.css";
 
 const API_URL = "http://localhost:8000";
-const POSTER_PADRAO = "https://placehold.co/160x240/111111/e03c2f?text=Sem+Poster";
 
-const getIdFilme = (filme) => filme?.id || filme?.id_filme;
-
-const formatarData = (valor) => {
-  if (!valor) return "";
-  const data = new Date(valor);
-  return Number.isNaN(data.getTime()) ? "" : data.toLocaleDateString("pt-BR");
-};
-
-const formatarValor = (valor) => {
-  if (Array.isArray(valor)) return valor.length > 0 ? valor.join(", ") : "Nenhum";
-  if (valor === null || valor === undefined || valor === "") return "Vazio";
-  if (typeof valor === "object") return JSON.stringify(valor);
-  return String(valor);
-};
-
-const normalizarValorComparacao = (valor, campo) => {
-  if (campo === "orcamento" || campo === "ano") {
-    const numero = Number(valor);
-    return Number.isNaN(numero) ? "" : String(numero);
-  }
-
-  if (Array.isArray(valor)) {
-    return valor
-      .map((item) => {
-        if (item && typeof item === "object") return item.id ?? item.id_filme ?? item.nome ?? JSON.stringify(item);
-        return item;
-      })
-      .filter((item) => item !== undefined && item !== null && item !== "")
-      .map(String)
-      .sort()
-      .join("|");
-  }
-
-  if (valor === null || valor === undefined || valor === "") return "";
-  if (typeof valor === "object") return JSON.stringify(valor);
-  return String(valor);
-};
-
-const camposRelacionados = {
-  ids_atores: ["atores", "id_ator"],
-  ids_categorias: ["categorias", "id_categoria"],
-  ids_diretores: ["diretores", "id_diretor"],
-  ids_linguagens: ["linguagens", "id_linguagem"],
-  ids_paises: ["paises", "id_pais"],
-  ids_produtoras: ["produtoras", "id_produtora"],
-};
-
-const rotulosCampos = {
-  titulo: "Titulo",
-  ano: "Ano",
-  duracao: "Duracao",
-  orcamento: "Orcamento",
-  sinopse: "Sinopse",
-  poster: "Poster",
-  banner: "Banner",
-  trailer: "Trailer",
-  ids_atores: "Atores",
-  ids_categorias: "Categorias",
-  ids_diretores: "Diretores",
-  ids_linguagens: "Idiomas",
-  ids_paises: "Paises",
-  ids_produtoras: "Produtoras",
-};
-
-const obterValorAtualFilme = (filme, campo) => {
-  const relacionamento = camposRelacionados[campo];
-
-  if (!relacionamento) return filme?.[campo];
-
-  const [chave, campoId] = relacionamento;
-  return Array.isArray(filme?.[chave])
-    ? filme[chave].map((item) => item?.id ?? item?.[campoId]).filter((item) => item !== undefined && item !== null)
-    : [];
-};
-
-const obterNomePorId = (id, listas, campoId) => {
-  const item = listas
-    .flat()
-    .find((opcao) => String(idDoItem(opcao, campoId)) === String(id));
-
-  return item ? nomeItem(item) : `ID ${id}`;
-};
-
-const formatarValorCampo = (campo, valor, edicao, auxiliares) => {
-  const relacionamento = camposRelacionados[campo];
-
-  if (!relacionamento) return formatarValor(valor);
-
-  const [chave, campoId] = relacionamento;
-  const listaAtualFilme = Array.isArray(edicao?.filme?.[chave]) ? edicao.filme[chave] : [];
-  const listaAuxiliar = Array.isArray(auxiliares?.[chave]) ? auxiliares[chave] : [];
-  const ids = Array.isArray(valor) ? valor : [];
-  const nomes = ids.map((id) => obterNomePorId(id, [listaAtualFilme, listaAuxiliar], campoId));
-
-  return formatarValor(nomes);
-};
-
-const obterResumoEdicao = (edicao, auxiliares) =>
-  Object.entries(edicao?.dados || {})
-    .map(([campo, valorNovo]) => {
-      const valorAntigo = obterValorAtualFilme(edicao?.filme, campo);
-
-      return {
-        campo,
-        label: rotulosCampos[campo] || campo,
-        antes: formatarValorCampo(campo, valorAntigo, edicao, auxiliares),
-        depois: formatarValorCampo(campo, valorNovo, edicao, auxiliares),
-        alterado: normalizarValorComparacao(valorAntigo, campo) !== normalizarValorComparacao(valorNovo, campo),
-      };
-    })
-    .filter((item) => item.alterado);
-
-export default function Admin() {
+export default function Gerenciamento() {
   const [filmes, setFilmes] = useState([]);
   const [pendentes, setPendentes] = useState([]);
   const [edicoesPendentes, setEdicoesPendentes] = useState([]);
@@ -219,7 +107,7 @@ export default function Admin() {
       return;
     }
 
-    buscarDadosAdmin();
+    Promise.resolve().then(buscarDadosAdmin);
   }, [token, navigate, usuarioEhAdmin, buscarDadosAdmin]);
 
   const handleAprovarFilme = async (idFilme) => {
@@ -231,8 +119,8 @@ export default function Admin() {
 
       if (!resp.ok) throw new Error("Nao foi possivel aprovar o filme.");
 
-      const filmeAprovado = pendentes.find((filme) => getIdFilme(filme) === idFilme);
-      setPendentes((atuais) => atuais.filter((filme) => getIdFilme(filme) !== idFilme));
+      const filmeAprovado = pendentes.find((filme) => pegarIdFilme(filme) === idFilme);
+      setPendentes((atuais) => atuais.filter((filme) => pegarIdFilme(filme) !== idFilme));
       if (filmeAprovado) setFilmes((atuais) => [...atuais, { ...filmeAprovado, flag: true }]);
 
       setPopup({
@@ -268,9 +156,9 @@ export default function Admin() {
       if (!resp.ok) throw new Error("Nao foi possivel excluir este filme.");
 
       if (isPendente) {
-        setPendentes((atuais) => atuais.filter((filme) => getIdFilme(filme) !== idFilme));
+        setPendentes((atuais) => atuais.filter((filme) => pegarIdFilme(filme) !== idFilme));
       } else {
-        setFilmes((atuais) => atuais.filter((filme) => getIdFilme(filme) !== idFilme));
+        setFilmes((atuais) => atuais.filter((filme) => pegarIdFilme(filme) !== idFilme));
       }
 
       setPopup({
@@ -295,7 +183,7 @@ export default function Admin() {
   };
 
   const handleDeletarFilme = (filme, isPendente = false) => {
-    const idFilme = getIdFilme(filme);
+    const idFilme = pegarIdFilme(filme);
 
     setPopup({
       aberto: true,
@@ -377,110 +265,33 @@ export default function Admin() {
       <div className="admin-container">
         <h1 className="admin-titulo-secao">Gerenciamento</h1>
 
-        <div className="admin-resumo-grid">
-          <div className="admin-card-resumo">
-            <Film size={32} color="#e03c2f" />
-            <h2>{filmes.length}</h2>
-            <p>Total de Filmes</p>
-          </div>
+        <ResumoGerenciamento
+          totalFilmes={filmes.length}
+          totalPendentes={pendentes.length}
+          totalEdicoes={edicoesPendentes.length}
+        />
 
-          <div className="admin-card-resumo">
-            <Clock size={32} color="#eab308" />
-            <h2>{pendentes.length}</h2>
-            <p>Filmes Pendentes</p>
-          </div>
+        <SecaoFilmes
+          titulo="Filmes Pendentes"
+          vazio="Nenhum filme pendente."
+          filmes={pendentes}
+          pendente
+          onAprovar={handleAprovarFilme}
+          onExcluir={handleDeletarFilme}
+        />
 
-          <div className="admin-card-resumo">
-            <Pencil size={32} color="#3b82f6" />
-            <h2>{edicoesPendentes.length}</h2>
-            <p>Edicoes Pendentes</p>
-          </div>
-        </div>
+        <SecaoEdicoes
+          edicoes={edicoesPendentes}
+          auxiliares={auxiliares}
+          onAnalisar={confirmarAnaliseEdicao}
+        />
 
-        <h2 className="admin-titulo-secao">Filmes Pendentes</h2>
-        <div className="admin-lista-vertical">
-          {pendentes.length === 0 ? <p className="admin-vazio">Nenhum filme pendente.</p> : null}
-
-          {pendentes.map((filme) => (
-            <div key={`pendente-${getIdFilme(filme)}`} className="admin-item-lista">
-              <div className="admin-item-info">
-                <img src={filme.imagem || filme.poster || POSTER_PADRAO} alt={filme.titulo} className="admin-item-poster" />
-                <div className="admin-textos">
-                  <h3>{filme.titulo}</h3>
-                  <p>{filme.ano} - ID: {getIdFilme(filme)}</p>
-                </div>
-              </div>
-              <div className="admin-item-acoes">
-                <button className="btn-aprovar" onClick={() => handleAprovarFilme(getIdFilme(filme))} title="Aprovar Filme">
-                  <Check size={20} strokeWidth={3} />
-                </button>
-                <button className="btn-deletar" onClick={() => handleDeletarFilme(filme, true)} title="Excluir Filme">
-                  <Trash2 size={20} color="#e03c2f" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <h2 className="admin-titulo-secao">Solicitacoes de Edicao</h2>
-        <div className="admin-lista-vertical">
-          {edicoesPendentes.length === 0 ? <p className="admin-vazio">Nenhuma edicao pendente.</p> : null}
-
-          {edicoesPendentes.map((edicao) => {
-            const alteracoes = obterResumoEdicao(edicao, auxiliares);
-
-            return (
-              <div key={`ed-${edicao.id_solicitacao}`} className="admin-item-lista">
-                <div className="admin-item-info">
-                  <img src={edicao.filme?.poster || edicao.filme?.imagem || POSTER_PADRAO} alt={edicao.filme?.titulo} className="admin-item-poster" />
-                  <div className="admin-textos">
-                    <h3>{edicao.filme?.titulo || "Filme nao informado"}</h3>
-                    <p className="admin-subtexto">
-                      por {edicao.usuario?.apelido || edicao.usuario?.nome || "usuario"} {formatarData(edicao.data_criacao)}
-                    </p>
-                    {alteracoes.length === 0 ? (
-                      <p className="admin-subtexto">Nenhuma mudanca detectada.</p>
-                    ) : alteracoes.map((item) => (
-                      <p key={item.campo} className="admin-subtexto admin-comparacao">
-                        {item.label}: <span className="valor-antigo">{item.antes}</span> <span className="seta-comparacao">-&gt;</span> <span className="valor-novo">{item.depois}</span>
-                      </p>
-                    ))}
-                  </div>
-                </div>
-                <div className="admin-item-acoes">
-                  <button className="btn-aprovar" onClick={() => confirmarAnaliseEdicao(edicao, "aprovar")} title="Aprovar Edicao">
-                    <Check size={20} strokeWidth={3} />
-                  </button>
-                  <button className="btn-rejeitar" onClick={() => confirmarAnaliseEdicao(edicao, "rejeitar")} title="Rejeitar Edicao">
-                    <X size={20} strokeWidth={3} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <h2 className="admin-titulo-secao">Todos os Filmes</h2>
-        <div className="admin-lista-vertical">
-          {filmes.length === 0 ? <p className="admin-vazio">Nenhum filme catalogado.</p> : null}
-
-          {filmes.map((filme) => (
-            <div key={`all-${getIdFilme(filme)}`} className="admin-item-lista">
-              <div className="admin-item-info">
-                <img src={filme.imagem || filme.poster || POSTER_PADRAO} alt={filme.titulo} className="admin-item-poster" />
-                <div className="admin-textos">
-                  <h3>{filme.titulo}</h3>
-                  <p>{filme.ano} - ID: {getIdFilme(filme)}</p>
-                </div>
-              </div>
-              <div className="admin-item-acoes">
-                <button className="btn-deletar" onClick={() => handleDeletarFilme(filme, false)} title="Excluir Filme">
-                  <Trash2 size={20} color="#e03c2f" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <SecaoFilmes
+          titulo="Todos os Filmes"
+          vazio="Nenhum filme catalogado."
+          filmes={filmes}
+          onExcluir={handleDeletarFilme}
+        />
       </div>
 
       <Popup

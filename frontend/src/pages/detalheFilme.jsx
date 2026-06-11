@@ -13,18 +13,22 @@ import Popup from "../components/popup";
 import {
   API_URL,
   AUXILIARES_VAZIOS,
-  CAMPOS_EDICAO,
-  CAMPOS_LISTA_EDICAO,
   CONFIG_CRIACAO_AUXILIAR,
   criarFormularioFilme,
-  formatarValorPopup,
   idDoItem,
   montarPayloadAuxiliar,
-  nomeItem,
   normalizarLista,
   obterUrlTrailerEmbed,
   usuarioEhAdmin,
 } from "../utils/movieForm";
+import {
+  AVALIACAO_VAZIA,
+  buscarAvaliacaoDoFilme,
+  buscarDadosAuxiliaresFilme,
+  buscarFavoritoDoFilme,
+  buscarFilmePorId,
+} from "../utils/dadosFilme";
+import { montarPayloadAlteradoFilme, montarPayloadEdicaoFilme, obterAlteracoesFilme } from "../utils/edicaoFilme";
 import "./css/detalheFilme.css";
 
 const POSTER_PADRAO = "https://placehold.co/500x750/111111/e03c2f?text=Sem+Poster";
@@ -39,7 +43,7 @@ export default function FilmeDetalhes() {
   const [salvando, setSalvando] = useState(false);
   const [favoritado, setFavoritado] = useState(false);
   const [favoritando, setFavoritando] = useState(false);
-  const [avaliacao, setAvaliacao] = useState({ nota_usuario: null, media: 0, total: 0 });
+  const [avaliacao, setAvaliacao] = useState(AVALIACAO_VAZIA);
   const [salvandoAvaliacao, setSalvandoAvaliacao] = useState(false);
   const [form, setForm] = useState(criarFormularioFilme(null));
   const [auxiliares, setAuxiliares] = useState(AUXILIARES_VAZIOS);
@@ -62,44 +66,14 @@ export default function FilmeDetalhes() {
         setCarregando(true);
         setErro("");
 
-        const resposta = await fetch(`${API_URL}/filmes/${id}`);
-
-        if (!resposta.ok) {
-          throw new Error("Filme nao encontrado.");
-        }
-
-        const dados = await resposta.json();
+        const dados = await buscarFilmePorId(id);
         setFilme(dados);
         setForm(criarFormularioFilme(dados));
 
         const token = localStorage.getItem("access_token");
         const filmeId = dados.id || dados.id_filme;
-
-        if (token && filmeId) {
-          const respostaFavorito = await fetch(`${API_URL}/favoritos/${filmeId}`, {
-            headers: { "Authorization": `Bearer ${token}` },
-          });
-
-          if (respostaFavorito.ok) {
-            const dadosFavorito = await respostaFavorito.json();
-            setFavoritado(Boolean(dadosFavorito.favoritado));
-          } else {
-            setFavoritado(false);
-          }
-
-          const respostaAvaliacao = await fetch(`${API_URL}/filmes/${filmeId}/avaliacao`, {
-            headers: { "Authorization": `Bearer ${token}` },
-          });
-
-          if (respostaAvaliacao.ok) {
-            setAvaliacao(await respostaAvaliacao.json());
-          } else {
-            setAvaliacao({ nota_usuario: null, media: 0, total: 0 });
-          }
-        } else {
-          setFavoritado(false);
-          setAvaliacao({ nota_usuario: null, media: 0, total: 0 });
-        }
+        setFavoritado(await buscarFavoritoDoFilme(filmeId, token));
+        setAvaliacao(await buscarAvaliacaoDoFilme(filmeId, token));
       } catch (erroBusca) {
         console.error("Erro ao buscar filme:", erroBusca);
         setFilme(null);
@@ -118,30 +92,7 @@ export default function FilmeDetalhes() {
 
     const buscarAuxiliares = async () => {
       try {
-        const [
-          respAtores,
-          respCategorias,
-          respDiretores,
-          respLinguagens,
-          respPaises,
-          respProdutoras,
-        ] = await Promise.all([
-          fetch(`${API_URL}/dados/atores`),
-          fetch(`${API_URL}/dados/categorias`),
-          fetch(`${API_URL}/dados/diretores`),
-          fetch(`${API_URL}/dados/linguagens`),
-          fetch(`${API_URL}/dados/paises`),
-          fetch(`${API_URL}/dados/produtoras`),
-        ]);
-
-        setAuxiliares({
-          atores: respAtores.ok ? await respAtores.json() : [],
-          categorias: respCategorias.ok ? await respCategorias.json() : [],
-          diretores: respDiretores.ok ? await respDiretores.json() : [],
-          linguagens: respLinguagens.ok ? await respLinguagens.json() : [],
-          paises: respPaises.ok ? await respPaises.json() : [],
-          produtoras: respProdutoras.ok ? await respProdutoras.json() : [],
-        });
+        setAuxiliares(await buscarDadosAuxiliaresFilme());
       } catch (erroAuxiliares) {
         console.error("Erro ao buscar dados auxiliares:", erroAuxiliares);
       }
@@ -313,86 +264,6 @@ export default function FilmeDetalhes() {
     setEditando(false);
   };
 
-  const montarPayloadEdicao = (apenasAlterados = false) => {
-    const payload = {
-      titulo: form.titulo.trim(),
-      ano: form.ano ? Number(form.ano) : null,
-      duracao: form.duracao.trim() || null,
-      orcamento: form.orcamento ? Number(form.orcamento) : null,
-      sinopse: form.sinopse.trim() || null,
-      poster: form.poster.trim() || null,
-      banner: form.banner.trim() || null,
-      trailer: form.trailer.trim() || null,
-      ids_atores: form.ids_atores.map(Number),
-      ids_categorias: form.ids_categorias.map(Number),
-      ids_diretores: form.ids_diretores.map(Number),
-      ids_linguagens: form.ids_linguagens.map(Number),
-      ids_paises: form.ids_paises.map(Number),
-      ids_produtoras: form.ids_produtoras.map(Number),
-    };
-
-    if (!apenasAlterados) return payload;
-
-    const original = criarFormularioFilme(filme);
-    const alterados = {};
-
-    CAMPOS_EDICAO.forEach(([campo]) => {
-      if (String(original[campo] ?? "") !== String(form[campo] ?? "")) {
-        alterados[campo] = payload[campo];
-      }
-    });
-
-    CAMPOS_LISTA_EDICAO.forEach(([campo]) => {
-      const antes = [...original[campo]].sort().join(",");
-      const depois = [...form[campo]].sort().join(",");
-
-      if (antes !== depois) {
-        alterados[campo] = payload[campo];
-      }
-    });
-
-    return alterados;
-  };
-
-  const formatarListaPorIds = (campo, itens, campoId) => {
-    const idsSelecionados = form[campo];
-    const nomes = itens
-      .filter((item) => idsSelecionados.includes(String(idDoItem(item, campoId))))
-      .map(nomeItem)
-      .filter(Boolean);
-
-    return nomes.length > 0 ? nomes.join(", ") : "Nenhum";
-  };
-
-  const obterAlteracoesEdicao = () => {
-    const original = criarFormularioFilme(filme);
-    const alteracoes = [];
-
-    CAMPOS_EDICAO.forEach(([campo, label]) => {
-      if (String(original[campo] ?? "") !== String(form[campo] ?? "")) {
-        alteracoes.push({
-          label,
-          valor: `${formatarValorPopup(original[campo])} -> ${formatarValorPopup(form[campo])}`,
-        });
-      }
-    });
-
-    CAMPOS_LISTA_EDICAO.forEach(([campo, label, chaveAuxiliar, campoId]) => {
-      const antes = [...original[campo]].sort().join(",");
-      const depois = [...form[campo]].sort().join(",");
-
-      if (antes !== depois) {
-        const nomesAntes = normalizarLista(filme?.[chaveAuxiliar]).map(nomeItem).filter(Boolean);
-        alteracoes.push({
-          label,
-          valor: `${nomesAntes.length > 0 ? nomesAntes.join(", ") : "Nenhum"} -> ${formatarListaPorIds(campo, auxiliares[chaveAuxiliar], campoId)}`,
-        });
-      }
-    });
-
-    return alteracoes;
-  };
-
   const solicitarConfirmacaoEdicao = (event) => {
     event.preventDefault();
 
@@ -402,7 +273,7 @@ export default function FilmeDetalhes() {
       return;
     }
 
-    const alteracoes = obterAlteracoesEdicao();
+    const alteracoes = obterAlteracoesFilme(filme, form, auxiliares);
 
     if (alteracoes.length === 0) {
       setPopup({
@@ -425,7 +296,7 @@ export default function FilmeDetalhes() {
       textoConfirmar: admin ? "Atualizar" : "Enviar",
       textoCancelar: "Voltar",
       onCancelar: () => setPopup({ aberto: false }),
-      onConfirmar: () => salvarEdicao(montarPayloadEdicao(!admin), alteracoes),
+      onConfirmar: () => salvarEdicao(admin ? montarPayloadEdicaoFilme(form) : montarPayloadAlteradoFilme(filme, form), alteracoes),
     });
   };
 

@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, Mail, Pencil, Save, User, X } from "lucide-react";
+import { Mail, Pencil, Save, User, X } from "lucide-react";
+import { SecaoFavoritosPerfil, SecaoSolicitacoesPerfil } from "../components/SecoesPerfil";
 import Popup from "../components/popup";
 import "./css/perfil.css";
 
 const API_URL = "http://localhost:8000";
-const POSTER_PADRAO = "https://placehold.co/500x750/111111/e03c2f?text=Sem+Poster";
 
 const criarFormPerfil = (usuario) => ({
   nome: usuario?.nome || "",
@@ -20,27 +20,6 @@ const formatarValorPopup = (valor) => {
   return texto.length > 100 ? `${texto.slice(0, 97)}...` : texto;
 };
 
-const formatarValorSolicitacao = (valor) => {
-  if (Array.isArray(valor)) return valor.join(", ");
-  if (valor === null || valor === undefined || valor === "") return "Vazio";
-  if (typeof valor === "object") return JSON.stringify(valor);
-  return String(valor);
-};
-
-const resumirSolicitacao = (dados) => {
-  const alteracoes = Object.entries(dados || {}).map(([campo, valor]) => (
-    `${campo}: ${formatarValorSolicitacao(valor)}`
-  ));
-
-  return alteracoes.length > 0 ? alteracoes.slice(0, 3).join(" | ") : "Sem detalhes";
-};
-
-const textoStatus = (status) => {
-  if (status === "aprovada") return "Aprovada";
-  if (status === "rejeitada") return "Rejeitada";
-  return "Pendente";
-};
-
 const usuarioEhAdmin = () => {
   const token = localStorage.getItem("access_token");
   if (!token) return false;
@@ -53,14 +32,9 @@ const usuarioEhAdmin = () => {
   }
 };
 
-const textoStatusAdicao = (status) => {
-  if (status === "aprovada") return "Aprovado";
-  if (status === "rejeitada") return "Rejeitado";
-  return "Pendente";
-};
-
 export default function Perfil() {
   const navigate = useNavigate();
+  const admin = usuarioEhAdmin();
   const [usuario, setUsuario] = useState({
     nome: "",
     apelido: "",
@@ -74,10 +48,9 @@ export default function Perfil() {
   const [filmesFavoritos, setFilmesFavoritos] = useState([]);
   const [carregandoFavoritos, setCarregandoFavoritos] = useState(true);
   const [solicitacoesEdicao, setSolicitacoesEdicao] = useState([]);
-  const [carregandoSolicitacoes, setCarregandoSolicitacoes] = useState(true);
+  const [carregandoSolicitacoes, setCarregandoSolicitacoes] = useState(!admin);
   const [solicitacoesAdicao, setSolicitacoesAdicao] = useState([]);
-  const [carregandoAdicoes, setCarregandoAdicoes] = useState(true);
-  const admin = usuarioEhAdmin();
+  const [carregandoAdicoes, setCarregandoAdicoes] = useState(!admin);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -182,9 +155,6 @@ export default function Perfil() {
     if (!admin) {
       buscarSolicitacoes();
       buscarAdicoes();
-    } else {
-      setCarregandoSolicitacoes(false);
-      setCarregandoAdicoes(false);
     }
   }, [navigate, admin]);
 
@@ -326,15 +296,6 @@ export default function Perfil() {
     }
   };
 
-  const renderizarCategorias = (categoriasData) => {
-    const categorias = Array.isArray(categoriasData) ? categoriasData : [];
-    return categorias.slice(0, 2).map((categoria) => (
-      <span key={categoria.id || categoria.id_categoria || categoria.nome} className="tag">
-        {categoria.nome}
-      </span>
-    ));
-  };
-
   return (
     <div className="pagina-perfil">
       <div className="perfil-container-interno">
@@ -405,103 +366,34 @@ export default function Perfil() {
         )}
 
 
-        <section className="secao-perfil">
-          <h3>Filmes Favoritos ({filmesFavoritos.length})</h3>
-          <div className="grid-favoritos">
-            {carregandoFavoritos ? (
-              <p className="favoritos-vazio">Carregando favoritos...</p>
-            ) : filmesFavoritos.length > 0 ? filmesFavoritos.map((filme) => {
-              const filmeId = filme.id || filme.id_filme;
-              return (
-              <div key={`fav-${filmeId}`} className="card-filme-favorito">
-                <div className="poster-container">
-                  <img src={filme.poster || filme.imagem || POSTER_PADRAO} alt={filme.titulo} className="poster-filme" />
-
-                  <div className="icone-coracao">
-                    <Heart size={16} color="#e03c2f" fill="#e03c2f" />
-                  </div>
-                </div>
-                <div className="card-info">
-                  <h4 className="card-titulo">{filme.titulo}</h4>
-                  <span className="card-ano">{filme.ano}</span>
-                  <div className="card-tags">
-                    {renderizarCategorias(filme.categorias)}
-                  </div>
-                  <button
-                    className="btn-ver-detalhes-card"
-                    onClick={() => navigate(`/filme/${filmeId}`)}
-                  >
-                    Ver detalhes
-                  </button>
-                </div>
-              </div>
-            );
-            }) : (
-              <p className="favoritos-vazio">Nenhum filme favoritado ainda.</p>
-            )}
-          </div>
-        </section>
+        <SecaoFavoritosPerfil
+          filmes={filmesFavoritos}
+          carregando={carregandoFavoritos}
+          onDetalhes={(filmeId) => navigate(`/filme/${filmeId}`)}
+        />
 
 
         {!admin && (
-        <section className="secao-perfil">
-          <h3>Solicitacoes de Adicao ({solicitacoesAdicao.length})</h3>
-          <div className="lista-solicitacoes">
-            {carregandoAdicoes ? (
-              <p className="favoritos-vazio">Carregando solicitacoes de adicao...</p>
-            ) : solicitacoesAdicao.length > 0 ? solicitacoesAdicao.map((solic) => {
-              const filme = solic.filme || {};
-              const filmeId = filme.id || filme.id_filme;
-              const status = textoStatusAdicao(solic.status);
-              return (
-              <div key={`add-${solic.id_solicitacao || filmeId}`} className="card-solicitacao">
-                <div className="info-solicitacao-esquerda">
-                  <img src={filme.poster || filme.imagem || POSTER_PADRAO} alt={filme.titulo || "Filme"} className="thumb-solicitacao" />
-                  <div className="textos-solicitacao">
-                    <h4>{filme.titulo || "Filme nao informado"}</h4>
-                    <p>{filme.ano || "Ano nao informado"}</p>
-                  </div>
-                </div>
-                <div className="status-solicitacao">
-                  <span className={`badge-pendente ${status === "Aprovado" ? "badge-aprovada" : status === "Rejeitado" ? "badge-rejeitada" : ""}`}>{status}</span>
-                </div>
-              </div>
-            );
-            }) : (
-              <p className="favoritos-vazio">Nenhuma solicitacao de adicao enviada.</p>
-            )}
-          </div>
-        </section>
+          <SecaoSolicitacoesPerfil
+            titulo="Solicitacoes de Adicao"
+            vazio="Nenhuma solicitacao de adicao enviada."
+            carregandoTexto="Carregando solicitacoes de adicao..."
+            solicitacoes={solicitacoesAdicao}
+            carregando={carregandoAdicoes}
+            tipo="adicao"
+          />
         )}
 
 
         {!admin && (
-        <section className="secao-perfil">
-          <h3>Solicitacoes de Edicao ({solicitacoesEdicao.length})</h3>
-          <div className="lista-solicitacoes">
-            {carregandoSolicitacoes ? (
-              <p className="favoritos-vazio">Carregando solicitacoes...</p>
-            ) : solicitacoesEdicao.length > 0 ? solicitacoesEdicao.map((solic) => {
-              const filme = solic.filme || {};
-              return (
-              <div key={solic.id_solicitacao} className="card-solicitacao">
-                <div className="info-solicitacao-esquerda">
-                  <img src={filme.poster || filme.imagem || POSTER_PADRAO} alt={filme.titulo || "Filme"} className="thumb-solicitacao" />
-                  <div className="textos-solicitacao">
-                    <h4>{filme.titulo || "Filme nao informado"}</h4>
-                    <p>{resumirSolicitacao(solic.dados)}</p>
-                  </div>
-                </div>
-                <div className="status-solicitacao">
-                  <span className={`badge-pendente badge-${solic.status || "pendente"}`}>{textoStatus(solic.status)}</span>
-                </div>
-              </div>
-            );
-            }) : (
-              <p className="favoritos-vazio">Nenhuma solicitacao de edicao enviada.</p>
-            )}
-          </div>
-        </section>
+          <SecaoSolicitacoesPerfil
+            titulo="Solicitacoes de Edicao"
+            vazio="Nenhuma solicitacao de edicao enviada."
+            carregandoTexto="Carregando solicitacoes..."
+            solicitacoes={solicitacoesEdicao}
+            carregando={carregandoSolicitacoes}
+            tipo="edicao"
+          />
         )}
 
       </div>

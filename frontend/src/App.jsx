@@ -6,7 +6,7 @@ import Cadastro from "./pages/cadastro";
 import Perfil from "./pages/perfil"; 
 import Filmes from "./pages/filmes"; 
 import Detalhes from "./pages/detalheFilme"; 
-import Admin from "./pages/pageadm"; 
+import Gerenciamento from "./pages/pageadm"; 
 import AdicionarFilme from "./pages/adicionarFilme";
 
 export default function App() {
@@ -21,7 +21,7 @@ export default function App() {
           <Route path="filmes" element={<Filmes />} />
           <Route path="perfil" element={<Perfil />} /> 
            <Route path="filme/:id" element={<Detalhes />} />
-           <Route path="admin" element={<Admin />} />
+           <Route path="admin" element={<Gerenciamento />} />
            <Route path="adicionar" element={<AdicionarFilme />} />
         </Route>
       </Routes>
